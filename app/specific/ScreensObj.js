@@ -567,6 +567,8 @@ function ScreensObj_InitUserVod() {
             highlightSTR: 'UserVod_highlight',
             highlight: Main_getItemBool('UserVod_highlight', false),
             periodPos: Main_getItemInt('UserVod_periodPos', 1),
+            //kraken videos/followed was shut down by Twitch and helix has no replacement
+            apiRemoved: true,
             base_url: Main_kraken_api + 'videos/followed?limit=' + Main_ItemsLimitMax,
             set_url: function () {
                 this.token = Main_OAuth + AddUser_UsernameArray[0].access_token;
@@ -774,6 +776,8 @@ function ScreensObj_InitSearchLive() {
             table: 'stream_table_search_live',
             screen: Main_SearchLive,
             object: 'streams',
+            //kraken search/streams was shut down by Twitch, the search live button is also disabled in Search.js
+            apiRemoved: true,
             base_url: Main_kraken_api + 'search/streams?limit=' + Main_ItemsLimitMax + '&query=',
             set_url: function () {
                 this.check_offset();

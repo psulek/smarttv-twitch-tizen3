@@ -220,6 +220,7 @@ function Play_PreStart() {
         avplay.setAttribute('style', 'width:100%; height:100%; position: absolute;');
         document.getElementById('scene2').appendChild(avplay);
         Play_avplay = webapis.avplay;
+        Play_avplayNative = webapis.avplay;
         Play_TizenVersion = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
     }
 
@@ -304,6 +305,53 @@ var PlayStart_listener = {
         Play_StopAndClose();
     }
 };
+
+//Play_avplay is webapis.avplay or PlayHls_Player (PlayHls.js) for streams AVPlay can't play
+var Play_avplayNative;
+
+function Play_UsePlayer(useHls) {
+    var player = useHls ? PlayHls_Player : Play_avplayNative;
+
+    if (!player || Play_avplay === player) return;
+
+    Play_StopAndClose();
+    Play_avplay = player;
+    console.log('Play_UsePlayer ' + (useHls ? 'hls.js' : 'AVPlay'));
+}
+
+//Check the media playlist of a stream before playing it and save on the qualities list which player it needs (qualities.useHls),
+//fMP4 segments (#EXT-X-MAP) need hls.js as AVPlay of older TVs shows only a black screen
+function Play_CheckPlayerForPlaylist(qualities, callback) {
+    var mediaUrl = qualities && qualities[0] && qualities[0].url;
+
+    if (!Main_IsNotBrowser || !mediaUrl) {
+        callback();
+        return;
+    }
+
+    var xmlHttp = new XMLHttpRequest();
+    var done = false;
+    var finish = function (useHls) {
+        if (done) return;
+        done = true;
+        qualities.useHls = useHls;
+        callback();
+    };
+
+    xmlHttp.open('GET', mediaUrl, true);
+    xmlHttp.timeout = 5000;
+    xmlHttp.ontimeout = function () {
+        //keep the native player if the check fails
+        finish(false);
+    };
+    xmlHttp.onreadystatechange = function () {
+        if (xmlHttp.readyState === 4) {
+            finish(xmlHttp.status === 200 && xmlHttp.responseText.indexOf('#EXT-X-MAP') !== -1 && PlayHls_IsSupported());
+        }
+    };
+
+    xmlHttp.send(null);
+}
 
 function Play_StopAndCloseAndPlay(url) {
     Play_StopAndClose();
@@ -1065,7 +1113,9 @@ function Play_loadDataSuccess(responseText) {
         Play_playlistResponse = responseText;
         Play_qualities = Play_extractQualities(Play_playlistResponse);
         Play_state = Play_STATE_PLAYING;
-        if (Play_isOn) Play_qualityChanged();
+        Play_CheckPlayerForPlaylist(Play_qualities, function () {
+            if (Play_isOn) Play_qualityChanged();
+        });
 
         UserLiveFeed_PreventHide = false;
         ChatLive_Playing = true;
@@ -1073,53 +1123,75 @@ function Play_loadDataSuccess(responseText) {
 }
 
 function Play_extractQualities(input) {
-    var Band,
-        codec,
+    var bandwidth,
         result = [],
-        TempId = '',
-        tempCount = 1,
-        Resolution;
+        ids = {},
+        TempId = '';
 
     var streams = Play_extractStreamDeclarations(input);
 
     for (var i = 0; i < streams.length; i++) {
         TempId = streams[i].split('NAME="')[1].split('"')[0];
-        Band = Play_extractBand(streams[i].split('BANDWIDTH=')[1].split(',')[0]);
-        codec = Play_extractCodec(streams[i].split('CODECS="')[1].split('.')[0]);
-        Resolution = streams[i].split('RESOLUTION=')[1].split(',')[0];
 
-        if (!result.length) {
-            if (TempId.indexOf('ource') === -1) TempId = TempId + ' | source';
-            else TempId = TempId.replace('(', ' | ').replace(')', '');
-            result.push({
-                id: TempId,
-                band: Band,
-                codec: codec,
-                resolution: Resolution,
-                url: streams[i].split('\n')[2]
-            });
-        } else if (result[i - tempCount].id !== TempId && result[i - tempCount].id !== TempId + ' | source') {
-            result.push({
-                id: TempId,
-                band: Band,
-                codec: codec,
-                resolution: Resolution,
-                url: streams[i].split('\n')[2]
-            });
-        } else tempCount++;
+        //skip duplicated qualities
+        if (ids[TempId]) continue;
+        ids[TempId] = 1;
+
+        if (TempId.indexOf('ource') !== -1) TempId = TempId.replace('(', ' | ').replace(')', '');
+
+        bandwidth = parseInt(streams[i].split('BANDWIDTH=')[1].split(',')[0]);
+
+        result.push({
+            id: TempId,
+            band: Play_extractBand(bandwidth),
+            bandwidth: bandwidth,
+            codec: Play_extractCodec(streams[i].split('CODECS="')[1].split('.')[0]),
+            resolution: streams[i].split('RESOLUTION=')[1].split(',')[0],
+            url: streams[i].split('\n')[2]
+        });
     }
 
-    //sort based on resolution as it may not come sorted
+    //sort from highest to lowest resolution and bandwidth, twitch may send the qualities in a random order
     result.sort(function (a, b) {
-        if (!a || !b) {
-            return 0;
-        }
-
-        var resA = parseInt(a.resolution.split('p')[0]);
-        var resB = parseInt(b.resolution.split('p')[0]);
-
-        return resB - resA;
+        return Play_QualityHeight(b) - Play_QualityHeight(a) || (b.bandwidth || 0) - (a.bandwidth || 0);
     });
+
+    result = Play_CapQualities(result, Play_QualityHeight);
+
+    //the source is the default quality, if the playlist doesn't have one (or it was capped) use the highest quality
+    if (result.length && !Play_HasSource(result)) result[0].id += ' | source';
+
+    return result;
+}
+
+function Play_HasSource(list) {
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].id.indexOf('source') !== -1) return true;
+    }
+    return false;
+}
+
+function Play_QualityHeight(quality) {
+    //resolution is in 'widthxheight' format eg.: '2560x1440'
+    var height = parseInt((quality.resolution + '').split('x')[1]);
+    return isNaN(height) ? 0 : height;
+}
+
+//Some TVs (eg.: Full HD panels) can't decode streams above 1080p and only show a black screen
+var Play_MaxQualityHeight = 1080;
+
+//list must be sorted from highest to lowest quality
+function Play_CapQualities(list, getHeight) {
+    var result = [],
+        height;
+
+    for (var i = 0; i < list.length; i++) {
+        height = getHeight(list[i]);
+        if (isNaN(height) || height <= Play_MaxQualityHeight) result.push(list[i]);
+    }
+
+    //never return a empty list, keep the lowest quality if all are above the cap
+    if (!result.length && list.length) result.push(list[list.length - 1]);
 
     return result;
 }
@@ -1148,6 +1220,7 @@ function Play_extractStreamDeclarations(input) {
 
 function Play_qualityChanged() {
     window.clearInterval(Play_streamCheckId);
+    if (Main_IsNotBrowser) Play_UsePlayer(Play_qualities.useHls);
     Play_qualityIndex = 0;
     Play_playingUrl = Play_qualities[0].url;
 
@@ -1240,6 +1313,7 @@ function Play_SetHtmlQuality(element) {
     else quality_string = Play_quality;
 
     quality_string += Play_qualities[Play_qualityIndex].band + Play_qualities[Play_qualityIndex].codec;
+    if (Play_qualities.useHls) quality_string += ' | hls.js';
 
     Main_textContent(element, quality_string);
 }

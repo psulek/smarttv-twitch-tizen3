@@ -1,5 +1,9 @@
 {
   "dependencies": {
     "prettier": "^2.7.1"
+  },
+  "scripts": {
+    "stamp": "node release/stamp_build.js",
+    "deploy": "powershell -ExecutionPolicy Bypass -File release/deploy_tv.ps1"
   }
 }

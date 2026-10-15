@@ -533,7 +533,9 @@ function PlayVod_loadDataSuccess(responseText) {
         PlayVod_playlistResponse = responseText;
         PlayVod_qualities = Play_extractQualities(PlayVod_playlistResponse);
         PlayVod_state = Play_STATE_PLAYING;
-        if (PlayVod_isOn) PlayVod_qualityChanged();
+        Play_CheckPlayerForPlaylist(PlayVod_qualities, function () {
+            if (PlayVod_isOn) PlayVod_qualityChanged();
+        });
     }
 }
 
@@ -577,6 +579,7 @@ function PlayVod_isSub() {
 
 function PlayVod_qualityChanged() {
     window.clearInterval(PlayVod_streamCheckId);
+    if (Main_IsNotBrowser) Play_UsePlayer(PlayVod_qualities.useHls);
     PlayVod_qualityIndex = 0;
     PlayVod_playingUrl = PlayVod_qualities[0].url;
 
@@ -679,7 +682,9 @@ function PlayVod_onPlayer() {
                 //successCallback
                 console.log('Play_avplay.prepareAsync Vod OK:', 'date: ' + new Date());
                 Play_avplay.play();
-                ChannelVod_DurationSeconds = Play_avplay.getDuration() / 1000;
+                //keep the duration from the API if the player doesn't know it yet
+                var duration = Play_avplay.getDuration() / 1000;
+                if (duration > 0) ChannelVod_DurationSeconds = duration;
                 Main_textContent('progress_bar_duration', Play_timeS(ChannelVod_DurationSeconds));
                 if (Play_ChatEnable && !Play_isChatShown()) Play_showChat();
 
@@ -924,6 +929,7 @@ function PlayVod_SetHtmlQuality(element) {
     else quality_string = PlayVod_quality;
 
     quality_string += PlayVod_qualities[PlayVod_qualityIndex].band + PlayVod_qualities[PlayVod_qualityIndex].codec;
+    if (PlayVod_qualities.useHls) quality_string += ' | hls.js';
 
     Main_textContent(element, quality_string);
 }

@@ -470,10 +470,13 @@ function AddCode_RequestCheckFollowReady(xmlHttp) {
         if (xmlHttp.status === 200) {
             var response = JSON.parse(xmlHttp.responseText);
 
-            if (response && response.data.length) {
+            if (response && response.data && response.data.length) {
                 AddCode_RequestCheckFollowOK();
             } else {
-                AddCode_RequestCheckFollowError();
+                //helix returns 200 with a empty list when the user doesn't follow the channel
+                AddCode_IsFollowing = false;
+                if (AddCode_PlayRequest) Play_setFollow();
+                else ChannelContent_setFollow();
             }
         } else if (xmlHttp.status === 404) {
             //no
@@ -584,9 +587,9 @@ function AddCode_CheckSub() {
 }
 
 function AddCode_RequestCheckSub() {
-    var theUrl = Main_kraken_api + 'users/' + AddUser_UsernameArray[0].id + '/subscriptions/' + AddCode_Channel_id + Main_TwitchV5Flag_I;
+    var theUrl = Main_helix_api + 'subscriptions/user?broadcaster_id=' + AddCode_Channel_id + '&user_id=' + AddUser_UsernameArray[0].id;
 
-    AddCode_BasexmlHttpGet(theUrl, 'GET', 3, Main_OAuth + AddUser_UsernameArray[0].access_token, AddCode_RequestCheckSubReady);
+    AddCode_BasexmlHttpGet(theUrl, 'GET', 2, null, AddCode_RequestCheckSubReady);
 }
 
 function AddCode_RequestCheckSubReady(xmlHttp) {
@@ -595,17 +598,9 @@ function AddCode_RequestCheckSubReady(xmlHttp) {
             //success yes user is a SUB
             AddCode_IsSub = true;
             PlayVod_isSub();
-        } else if (xmlHttp.status === 422) {
-            //channel does not have a subscription program
-            AddCode_RequestCheckSubfail();
         } else if (xmlHttp.status === 404) {
             //success no user is not a sub
-            var response = JSON.parse(xmlHttp.responseText);
-            if (response.error) {
-                if ((response.error + '').indexOf('Not Found') !== -1) {
-                    AddCode_RequestCheckSubfail();
-                } else AddCode_RequestCheckSubError();
-            } else AddCode_RequestCheckSubError();
+            AddCode_RequestCheckSubfail();
         } else if (xmlHttp.status === 401 || xmlHttp.status === 403) {
             //token expired
             AddCode_refreshTokens(0, 0, AddCode_CheckSub, AddCode_RequestCheckSubfail);

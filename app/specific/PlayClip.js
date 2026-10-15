@@ -409,8 +409,14 @@ function PlayClip_QualityGenerate(response) {
             return b.quality - a.quality;
         });
 
+        var source = response[0];
+
+        response = Play_CapQualities(response, function (quality) {
+            return parseInt(quality.quality);
+        });
+
         for (var i = 0; i < response.length; i++) {
-            if (!PlayClip_qualities.length) {
+            if (response[i] === source) {
                 PlayClip_qualities.push({
                     id: response[i].quality + 'p' + PlayClip_FrameRate(response[i].frameRate) + ' | source | mp4',
                     url: response[i].sourceURL + token
@@ -434,6 +440,8 @@ function PlayClip_FrameRate(value) {
 }
 
 function PlayClip_qualityChanged() {
+    //clips are mp4 files, AVPlay plays them
+    if (Main_IsNotBrowser) Play_UsePlayer(false);
     window.clearInterval(PlayClip_streamCheckId);
     PlayClip_qualityIndex = 0;
     PlayClip_playingUrl = PlayClip_qualities[0].url;

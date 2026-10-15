@@ -150,6 +150,12 @@ function Screens_loadDataPrepare() {
 }
 
 function Screens_loadDataRequest() {
+    if (inUseObj.apiRemoved) {
+        //the API used by this screen was removed by Twitch, don't retry a request that will never work
+        Screens_loadDatafail(STR_410_FEATURING);
+        return;
+    }
+
     inUseObj.set_url();
     var xmlHttp;
     if (inUseObj.isKraken) {
@@ -219,14 +225,14 @@ function Screens_loadDataError() {
     } else Screens_loadDatafail();
 }
 
-function Screens_loadDatafail() {
+function Screens_loadDatafail(warning) {
     inUseObj.loadingData = false;
 
     if (!inUseObj.itemsCount) {
         Sidepannel_SetTopOpacity(Main_values.Main_Go);
         inUseObj.FirstLoad = false;
         Main_HideLoadDialog();
-        Main_showWarningDialog(STR_REFRESH_PROBLEM);
+        Main_showWarningDialog(warning || STR_REFRESH_PROBLEM);
         Main_ShowElement('topbar');
         Main_ShowElement('side_panel_new_holder');
 
@@ -1133,8 +1139,9 @@ function AGame_headerOptionsExit() {
 
 function AGame_follow() {
     if (AddUser_UserIsSet() && AddUser_UsernameArray[0].access_token) {
-        if (AGame_following) AddCode_UnFollowGame();
-        else AddCode_FollowGame();
+        //Twitch removed the API to follow/unfollow a game (old kraken API), there is no helix replacement
+        Main_showWarningDialog(STR_410_FEATURING);
+        window.setTimeout(Main_HideWarningDialog, 2000);
     } else {
         Main_showWarningDialog(STR_NOKEY_WARN);
         window.setTimeout(function () {
