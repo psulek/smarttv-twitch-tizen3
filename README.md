@@ -1,3 +1,7 @@
+> **This is a fork of [fgl27/smarttv-twitch](https://github.com/fgl27/smarttv-twitch)** that makes Twitch streams play again on older Samsung TVs with **Tizen 3.0** (2017 models, tested on UE65MU8002).
+>
+> Many Twitch channels (Enhanced Broadcasting / custom transcode) now deliver video as **fragmented MP4 (fMP4)** HLS segments instead of MPEG-TS. Tizen 3.0 can't decode them: the native player shows a black screen or an endless loading spinner, and the browser engine fails with a decode error. This fork plays those streams with [hls.js](https://github.com/video-dev/hls.js) and converts each fMP4 segment to MPEG-TS on the fly (`app/specific/PlayHlsRemux.js`), so live streams and VODs (including seeking) work again. Channels that still use MPEG-TS keep using the native player, and playback is capped at 1080p, the highest these TVs can decode.
+
 **smarttv-twitch**
 
 -   [About the project](#about-the-project)
