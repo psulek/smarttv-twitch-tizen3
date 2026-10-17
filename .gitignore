@@ -46,3 +46,5 @@ release/css/
 release/lib/
 release/images/
 app/.buildResult/
+# local deploy settings (TV IP, certificate profile), see .env.example
+.env

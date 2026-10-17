@@ -107,6 +107,9 @@ function en_USLang() {
     STR_ABOUT_INFO_3 = 'Contact information:';
     STR_ABOUT_INFO_4 = 'This is an open source application licensed under the GNU General Public License v3.0, check it on github';
     STR_ABOUT_INFO_5 = 'github.com/fgl27/smarttv-twitch';
+    STR_ABOUT_FORK =
+        'This build comes from a fork with fixes for older Samsung TVs with Tizen 3.0 (playback of Enhanced Broadcasting / custom transcode streams, login with twitch.tv/activate):';
+    STR_ABOUT_FORK_LINK = 'github.com/psulek/smarttv-twitch-tizen3';
     STR_ABOUT_INFO_6 = 'This application uses following dependencies:';
     STR_ABOUT_INFO_7 = 'irc-message - Performant, streaming IRC message parser (https://github.com/sigkell/irc-message)';
     STR_ABOUT_INFO_8 = 'Fontastic - Create your customized icon fonts in seconds (http://app.fontastic.me)';
@@ -265,6 +268,8 @@ function en_USLang() {
     STR_THUMB_RESOLUTION = 'Thumbnails quality';
     STR_THUMB_RESOLUTION_SUMARRY =
         "Default thumbnails resolution for live, videos and games (can't be applied for clips) a lower value will help the app load faster but the thumbnail may look blurry";
+    STR_PAYPAL_SUMMARY = 'Paypal donations use bellow link:';
+    STR_BITCOIN_SUMMARY = 'Bitcoin donations use wallet address:';
     STR_PLAYER_PROBLEM_2 = 'Connection failed, unable to load second stream info';
     STR_PLAYER_RESYNC = 'Player Auto Sync';
     STR_PLAYER_AUTO_BIG = 'Main window';

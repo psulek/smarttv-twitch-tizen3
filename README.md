@@ -1,349 +1,246 @@
-> **This is a fork of [fgl27/smarttv-twitch](https://github.com/fgl27/smarttv-twitch)** that makes Twitch streams play again on older Samsung TVs with **Tizen 3.0** (2017 models, tested on UE65MU8002).
->
-> Many Twitch channels (Enhanced Broadcasting / custom transcode) now deliver video as **fragmented MP4 (fMP4)** HLS segments instead of MPEG-TS. Tizen 3.0 can't decode them: the native player shows a black screen or an endless loading spinner, and the browser engine fails with a decode error. This fork plays those streams with [hls.js](https://github.com/video-dev/hls.js) and converts each fMP4 segment to MPEG-TS on the fly (`app/specific/PlayHlsRemux.js`), so live streams and VODs (including seeking) work again. Channels that still use MPEG-TS keep using the native player, and playback is capped at 1080p, the highest these TVs can decode.
+# SmartTV Client for Twitch (Tizen 3.0 fork)
 
-**smarttv-twitch**
+A fork of [fgl27/smarttv-twitch](https://github.com/fgl27/smarttv-twitch), the Twitch web app for Samsung Tizen TVs, made to keep it working on an older **Samsung TV with Tizen 3.0** (2017 models, tested on a UE65MU8002).
 
--   [About the project](#about-the-project)
--   [Android TV version](#android-tv-version)
--   [Contributing instructions](#contributing-instructions)
--   [About this fork](#about-this-fork)
--   [Project Web Dependencies](#project-web-dependencies)
--   [How the application looks](#how-the-application-looks)
--   [Twitch.TV authentication key](#twitchtv-authentication-key)
-    -   [Twitch.TV app for Samsung TV authorization request page](#twitchtv-app-for-samsung-tv-authorization-request-page)
-    -   [when accessing Twitch authorization site after adding yours credential (User and password) you will see the bellow information](#when-accessing-twitch-authorization-site-after-adding-yours-credential-user-and-password-you-will-see-the-bellow-information)
+The main fix: Twitch channels that use **Enhanced Broadcasting / custom transcode** stream video in a format Tizen 3.0 can't play, so they showed a black screen or an endless loading spinner. This fork plays them again, see [Enhanced Broadcasting / custom transcode streams on Tizen 3.0](#enhanced-broadcasting--custom-transcode-streams-on-tizen-30).
+
+The app is built from this repository and installed on the TV with one command (`npm run deploy`), without Tizen Studio's IDE.
+
+-   [What this fork changes](#what-this-fork-changes)
+-   [Enhanced Broadcasting / custom transcode streams on Tizen 3.0](#enhanced-broadcasting--custom-transcode-streams-on-tizen-30)
+-   [Requirements](#requirements)
+-   [One-time setup](#one-time-setup)
+-   [Deploy to the TV from the command line](#deploy-to-the-tv-from-the-command-line)
+-   [Test in a PC browser](#test-in-a-pc-browser)
+-   [Adding a Twitch user and key](#adding-a-twitch-user-and-key)
 -   [Controls](#controls)
-    -   [Below are the on-screen controls](#below-are-the-on-screen-controls)
-    -   [To access the controls from any screen press key A or on smart remote press the 4 color buttons (color) after Directional pad up for red A key and chose controls. If you are playing a stream, use the C yellow key to directly open the controls](#to-access-the-controls-from-any-screen-press-key-a-or-on-smart-remote-press-the-4-color-buttons-color-after-directional-pad-up-for-red-a-key-and-chose-controls-if-you-are-playing-a-stream-use-the-c-yellow-key-to-directly-open-the-controls)
-    -   [In app controls](#in-app-controls)
--   [Installation instructions:](#installation-instructions)
-    -   [Installation guide **Tizen Studio for TVs with Tizen 2.3 or newer** (tested on Linux Ubuntu 16 and up, windows 10 64 bits and macOS Mojave 10.14.4)](#installation-guide-tizen-studio-for-tvs-with-tizen-23-or-newer-tested-on-linux-ubuntu-16-and-up-windows-10-64-bits-and-macos-mojave-10144)
-    -   [Help and workarounds](#help-and-workarounds)
-    -   [Account and Downloads](#account-and-downloads)
-    -   [Set your TV to developer mode](#set-your-tv-to-developer-mode)
-    -   [Installing Tizen Studio and Java SDK on Windows 10](#installing-tizen-studio-and-java-sdk-on-windows-10)
-        -   [Via chocolately](#via-chocolately)
-    -   [Installing Tizen Studio and Java SDK on Ubunutu](#installing-tizen-studio-and-java-sdk-on-ubunutu)
-    -   [Tizen Package Manager(Installing the tools)](#tizen-package-managerinstalling-the-tools)
-    -   [Setting up the build environment:](#setting-up-the-build-environment)
-    -   [Generate a certificate:](#generate-a-certificate)
-    -   [Setup the application:](#setup-the-application)
-    -   [Install the application:](#install-the-application)
--   [Updates](#updates)
--   [In doubt open a issue](#in-doubt-open-a-issue)
--   [Donations](#donations)
--   [How to get the IP](#how-to-get-the-ip)
+-   [Building the minified release package](#building-the-minified-release-package)
+-   [Troubleshooting](#troubleshooting)
+-   [Credits and licenses](#credits-and-licenses)
 
-## About the project
+## What this fork changes
 
-This is an web application designed to give access to Twitch features on SmartTV's, a official Twitch app is not available for most devices, that is why this project exist.
+**Playback**
 
-The intention of this is to make a web app that works on all modern browser and can be easily ported to any OS that can run a web app.
+-   Streams and VODs in fMP4 format (Enhanced Broadcasting / custom transcode) play with [hls.js](https://github.com/video-dev/hls.js), and each segment is converted to MPEG-TS on the fly. Other streams keep using the TV's native player.
+-   Quality is capped at **1080p**. Higher qualities (1440p) only showed a black screen on these TVs.
+-   The quality marked "source" is the real highest quality. Twitch lists qualities in random order, and the app used to mark whichever came first.
+-   VODs played with hls.js show their full length and support seeking.
 
-This project is the "secondary" project of two Twitch project I current maintain, the primary project is the Android TV one [SmartTwitchTV](https://github.com/fgl27/SmartTwitchTV), the reason this is secondary is simple Tizen is a very limited and exhausting system to work on Android is much better in any form and way, because of that the Tizen version is always lagging behind on features in relation to Android plus some of the Android features can't be ported to the Tizen most related to multiple players support as the OS doesn't allows it.
+**Login**
 
-The application fully supports all 4k and 1080p Samsung TVs released in 2016 or later. The app also support TVs released in 2015 or earlier that have Tizen version 2.3 or newer, however for some old TV even running Tizen 2.3 may there be some minor FW issues that affect the app most of those have be fixed, so is expected that they all work if doesn't for you open a issue.
+-   Adding a key uses the Twitch **device code login**: the TV shows a code, you enter it on [twitch.tv/activate](https://www.twitch.tv/activate) on a phone or PC, and the TV continues by itself. No more tiny.cc link, external login page or typing a long key with the remote.
 
-This app has no affiliation with Twitch, this is a user made app, but is only possible because Twitch provide all the API that allows the app to show Twitch content.
+**Removed or fixed**
 
-Those API are documented here:
+-   Removed the TTV LOL / Purple Adblock proxy options. Both services are gone, and the proxy was enabled by default, which delayed every live stream start.
+-   Removed the donation block from About and the app's calls to fgl27's github.io (stylesheet, preconnect, login page). The icon font, app code and the short startup video the native player needs are bundled in the package; the online copy of that video is only a fallback.
+-   The follow check is skipped for users without a key (it only produced endless 401 errors), and one malformed chat message no longer breaks loading the recent chat.
+-   Screens that rely on removed Twitch APIs (user VODs, live search) show a message instead of failing.
 
-[Twitch Developer Documentation](https://dev.twitch.tv/docs/)
+**For development**
 
-This app has be registered to access Twitch API, that registration process is described here:
+-   About shows when and on which PC the installed build was made.
+-   The build installs as a separate app, **"SmartTV Client for Twitch (dev)"** with a blue icon (app id `flbtxFhd64.SmartTV`), so it can sit next to the original fgl27 app (`UHdbzowRXA.SmartTV`).
+-   [`release/deploy_tv.ps1`](release/deploy_tv.ps1) builds, signs, installs and launches the app from the command line.
+-   [`webserver.js`](webserver.js) runs the app in a PC browser, including live streams and VODs.
 
-[Twitch Registration process](https://dev.twitch.tv/docs/authentication#registration)
+## Enhanced Broadcasting / custom transcode streams on Tizen 3.0
 
-## Android TV version
+### The problem
 
-An Android version of this is available here:
-[SmartTwitchTV](https://github.com/fgl27/SmartTwitchTV)<br>
-The Android version is a full web-based app and can be used to port this project to any other OS, so check that in case you want to port this for a web-based OS.
+With Enhanced Broadcasting, the streamer's PC encodes all qualities itself (shown by Twitch as a "Custom" transcode). Twitch delivers those streams as **fragmented MP4 (fMP4 / CMAF)** HLS segments: the playlists contain `#EXT-X-MAP` and the segments are `.mp4` instead of the classic `.ts` (MPEG-TS) segments. No Twitch API option returns `.ts` for these channels.
 
-## Contributing instructions
+On a Tizen 3.0 TV:
 
-Any Help is welcome you can use a github PR, [issue](https://github.com/fgl27/smarttv-twitch/issues/new/choose) or send a [email](mailto:fglfgl27@gmail.com).
+| Player | Result |
+| --- | --- |
+| Native AVPlay (what the app used) | Black screen or endless loading spinner |
+| hls.js + the TV's browser engine (MSE), fMP4 passed through | `MEDIA_ERR_DECODE` (video error 3) right after the first frame metadata |
+| hls.js with audio and video in separate buffers (the approach of [numbereleven-a/smarttv-twitch-old-tizen](https://github.com/numbereleven-a/smarttv-twitch-old-tizen), reported to work on Tizen 2.4) | Still `MEDIA_ERR_DECODE` on Tizen 3.0 |
+| **hls.js with each fMP4 segment converted to MPEG-TS** | **Works**, live and VOD |
 
-## About this fork
+The TV can play the same video and audio when it arrives as MPEG-TS: hls.js then uses its own TS demuxer and builds MP4 data the TV's engine accepts. The likely reason is the timestamp layout of Twitch's fMP4 (very large 64-bit timestamps, chunked CMAF fragments), not the codecs themselves.
 
-I initially fork this from https://github.com/CazuzaCzz/SmartTwitchTV/commits/tizen
-The original fork is https://github.com/nikitakatchik/SmartTwitchTV
+### How the fix works
 
-I have started this project because the above repo's of the app did not fully support my TV model (at the time this was a Samsung Tizen OS only project) and didn't had all possible Twitch featuring.
+1. Before playing, the app loads the stream's media playlist (`Play_CheckPlayerForPlaylist` in [`Play.js`](app/specific/Play.js)). If it contains `#EXT-X-MAP`, the stream is fMP4 and the app switches to the hls.js player; otherwise it keeps the native AVPlay player.
+2. [`PlayHls.js`](app/specific/PlayHls.js) is a player with the same interface as Samsung's AVPlay (open, prepare, play, seek, duration, …), built on a `<video>` element and hls.js, so the rest of the app doesn't need to know which player runs.
+3. Its fragment loader passes every downloaded fMP4 segment to [`PlayHlsRemux.js`](app/specific/PlayHlsRemux.js), which converts it to MPEG-TS: it reads the init segment (H.264 SPS/PPS, AAC configuration) and each fragment's samples, then writes TS packets with PES headers and PTS/DTS timestamps, adds SPS/PPS on keyframes and wraps the audio in ADTS frames.
+4. hls.js sees MPEG-TS, demuxes it with its TS demuxer and plays it.
 
-I keep the original name and commit history but not as a fork simply because I made so may changes that makes no sense to call this a fork, I have made an new application from scratch focusing on performance and all available Twitch featuring, with the help of users and contributors reporting bugs and asking for features the app became what is today, a app that can be easily used to watch all available Twitch content and give the user a lot of extra options, but is know that the application can be improved new featuring and improves are always in the works, mostly to give a better experience and more options to the user, but that process is slow mostly because there is only one person working on the project and that work is done for free on spare time.
+The quality line in the player info shows **`| hls.js`** when a stream plays this way. Clips are always MP4 files and keep using the native player.
 
-## Project Web Dependencies
+On a retail TV there are no logs. For diagnostics, set `var PlayHls_ShowDebug = true;` in [`PlayHls.js`](app/specific/PlayHls.js) and redeploy: a green panel on screen shows what the player is doing.
 
--   [irc-message - Performant, streaming IRC message parser](https://github.com/sigkell/irc-message)
--   [punycode - A robust Punycode converter that fully complies to RFC 3492 and RFC 5891](https://github.com/bestiejs/punycode.js)
--   [crass - A CSS minification, pretty printing, and general utility library written in JS](https://github.com/mattbasta/crass)
--   [UglifyJS - is a JavaScript parser, minifier, compressor and beautifier toolkit](https://github.com/mishoo/UglifyJS2)
--   [HTMLMinifier - is a highly configurable, well-tested, JavaScript-based HTML minifier](https://github.com/kangax/html-minifier)
--   [JSHint - A Static Code Analysis Tool for JavaScript](https://github.com/jshint/jshint)
--   [Twemoji - A simple library that provides standard Unicode emoji support across all platforms](https://github.com/twitter/twemoji)
--   [Fontastic - Create your customized icon fonts in seconds](http://app.fontastic.me)
--   [Twitch Developer Documentation](https://dev.Twitch/docs/)
--   [Samsung WebApi API - this module defines the functionalities that are provides as the Samsung TV for Tizen Platform Product API](http://developer.samsung.com/tv/develop/api-references/samsung-product-api-references/webapi-api)
+### Tested on
 
-## [How the application looks](https://github.com/fgl27/smarttv-twitch/tree/master/screenshot)
+| | |
+| --- | --- |
+| TV | Samsung **UE65MU8002** (65" 4K UHD, MU8000 series, 2017) |
+| System | **Tizen 3.0**, browser engine `AppleWebKit/538.1` |
+| Stream tested | Enhanced Broadcasting channel [oatley](https://www.twitch.tv/oatley) (fMP4, played at 1080p60) |
+| Works | Live streams, VODs with full length and seeking, quality changes |
+| Before the fix | Black screen or endless loading spinner on the same channels |
+| Date | October 2026 |
 
-The application never stops receiving updates so the below images could be outdated
-![Live](https://fgl27.github.io/smarttv-twitch/screenshot/animated.gif)
+Channels without Enhanced Broadcasting (MPEG-TS) were checked on the same TV and still play with the native player. Other Tizen 3.0 TVs (2017 Samsung models) very likely behave the same, but only this one was tested.
 
-## Twitch.TV authentication key
+## Requirements
 
-![Add_key](https://fgl27.github.io/smarttv-twitch/screenshot/Add_key.png)
-![Add_key](https://fgl27.github.io/smarttv-twitch/screenshot/Add_key2.png)
+-   Windows PC (the deploy script is PowerShell; Windows PowerShell 5.1 or PowerShell 7)
+-   [Node.js](https://nodejs.org/) 18 or newer
+-   [Tizen Studio](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/installing-tv-sdk.html) with the TV extensions, installed in `C:\tizen-studio` (another folder works with `-TizenStudio`)
+-   A Samsung account and a Tizen certificate profile, see below
+-   The TV and the PC on the same network
 
-The key is generated on the page below. The page receives a key after you use it to request one with the official Twitch.TV web site. The link below is the same that you would see on the application screen.
+## One-time setup
 
-### [Twitch.TV app for Samsung TV authorization request page](http://tiny.cc/twitchkey)
+### 1. Install Tizen Studio
 
-### when accessing Twitch authorization site after adding yours credential (User and password) you will see the bellow information
+1. Download and install **Tizen Studio with IDE installer** from the [Samsung developer site](https://developer.samsung.com/smarttv/develop/getting-started/setting-up-sdk/installing-tv-sdk.html).
+2. Open **Package Manager** and install:
+    - **Main SDK**: Tizen SDK tools
+    - **Extension SDK**: under **TV Extensions-x.x**, **Web app. Development**, the **Samsung Certificate Extension** and, under TV Extension Tools, **Web app. Tools**
 
-![logging](https://fgl27.github.io/smarttv-twitch/screenshot/logging.png)
+If the TV Extensions are missing in Package Manager, see [fgl27/smarttv-twitch#157](https://github.com/fgl27/smarttv-twitch/issues/157#issuecomment-842215657).
 
-**The app uses the following permission:**
+### 2. Create a certificate profile
 
--   user:read:follows, user:read:subscriptions, chat:edit, chat:read they are summarized here [Twitch Access Token Scopes](https://dev.twitch.tv/docs/authentication/scopes)<br>
+In Tizen Studio: **Tools > Certificate Manager > + > Tizen**, give the profile a name, create a new author certificate (name and password), keep the default distributor and click **Finish**. Make sure the profile has the check mark (active).
 
-**How the app uses it individual permission:**
+Remember the profile name, the deploy script needs it (`CERT_PROFILE`). If creating the author certificate hangs, use the workaround in fgl27's [certificate instructions](https://github.com/fgl27/smarttv-twitch#generate-a-certificate).
 
-**Read your list of follows:**
+### 3. Enable developer mode on the TV
 
--   The permission used for this is **user:read:follows** the API used on this is [Get Followed Streams](https://dev.twitch.tv/docs/api/reference#get-followed-streams)
+1. Find your PC's IP address: run `ipconfig` and use the IPv4 address of the adapter connected to the TV's network (not a VirtualBox/VPN adapter).
+2. On the TV, open **Apps** and press **1 2 3 4 5** on the remote.
+3. Turn **Developer mode** on, enter the PC's IP as **Host PC IP** and confirm.
+4. Restart the TV (hold the power button, or unplug it).
 
-**Get the details of your subscription to a channel.:**
+The TV's own IP is in **Settings > General > Network > Network Status > IP Settings**.
 
--   The permission used for this is **user:read:subscriptions** the API's used on this is [Check User Subscription by Channel](https://dev.twitch.tv/docs/api/reference#check-user-subscription)
--   Allows to check if you are sub to a particularly channel, that information is used to display chat emotes on the write to chat option and also to give a on screen warning when a content is block for Sub-only (a Sub-only chat ROOM (write mode, read will always work) or a VOD for example).
--   Unfortunately twitch has blocked all third party app's to access any user privilege that includes sub or turbo privilege, on the past that wasn't a issue but today is, so today the app can only let you know why you can't see something by displaying a on-screen warning<br>
+### 4. Clone the repository
 
-**Send live Stream Chat and Rooms messages:**
+```
+git clone https://github.com/psulek/smarttv-twitch-tizen3.git
+cd smarttv-twitch-tizen3
+```
 
--   The permission used for this is **chat:edit** the API used on this is [Authenticating with the Twitch IRC Server](https://dev.twitch.tv/docs/irc/authenticate-bot#getting-an-access-token)
--   Allows access so you can use the app to logging in on Twitch chat using yours username to send chat messages.
--   Also enable you to receive gifted sub give for user in chat.<br>
+`node_modules` aren't needed to deploy; the scripts only use Node's built-in modules.
 
-**View live Stream Chat and Rooms messages:**
+## Deploy to the TV from the command line
 
--   The permission used for this is **chat:read** the API used on this is [Authenticating with the Twitch IRC Server](https://dev.twitch.tv/docs/irc/authenticate-bot#getting-an-access-token)
--   Allows access so you can use the app to logging in on Twitch chat using yours username to read chat messages as yours user (technically the app can read chat without a user but the bellow option will not work on that case as the login is as anonymous).
--   Also enable you to receive gifted sub give for user in chat.<br>
+### Settings: `.env`
+
+Copy [`.env.example`](.env.example) to `.env` in the repository root and fill it in (`.env` is git-ignored):
+
+```
+TV_IP=192.168.1.50
+CERT_PROFILE=MyProfile
+```
+
+Values that are missing or empty are asked for when the script runs. For the certificate profile, pressing Enter uses the active Tizen Studio profile.
+
+### Deploy
+
+```
+npm run deploy
+```
+
+or, with parameters:
+
+```
+powershell -ExecutionPolicy Bypass -File release/deploy_tv.ps1 -Ip 192.168.1.50 -NoRun
+```
+
+| Parameter | Default | Meaning |
+| --- | --- | --- |
+| `-Ip` | `.env` `TV_IP`, else asked | TV IP address |
+| `-TvPort` | `26101` | TV developer port |
+| `-CertProfile` | `.env` `CERT_PROFILE`, else asked | Tizen Studio certificate profile used to sign |
+| `-TizenStudio` | `C:\tizen-studio` | Tizen Studio folder |
+| `-NoRun` | off | Install only, don't launch the app |
+| `-TestMode` | off | Keep test mode: red "TEST ONLY" warning, extra logs |
+
+Parameters win over `.env`. Unknown parameter names stop the script with an error.
+
+### What the script does
+
+1. Writes `app/build_info.js` (PC name, user, date, shown in About; git-ignored).
+2. Connects to the TV with `sdb`.
+3. Builds the app from `app/` into `app/.buildResult` and switches the build copy to release mode (`Main_isReleased = true`). The source stays in test mode for browser testing.
+4. Packages and signs the `.wgt` with your certificate profile.
+5. Installs it on the TV and launches it.
+
+The app runs from the files in the package; it doesn't download code at startup. To update, pull the changes and deploy again.
+
+## Test in a PC browser
+
+```
+npm run serve
+```
+
+Then open [http://localhost:8765](http://localhost:8765). In VS Code, **Run and Debug** has two entries that start the server and open the browser, one of them with Chrome debugging (breakpoints in `app/`).
+
+[`webserver.js`](webserver.js) serves `app/` with caching disabled and also works as a proxy for Twitch's video servers, which block requests from other web pages (CORS). Live streams and VODs play in the browser with the same hls.js player and fMP4→TS conversion as on the TV; clips don't play in the browser. Other servers (for example `python -m http.server`) show the app but can't play video.
+
+Keyboard in browser mode:
+
+| Key | TV remote |
+| --- | --- |
+| Arrows, Enter | D-pad, OK (Enter also confirms text fields) |
+| `1` | Back |
+| `A` `B` `C` `D` | Red, green, yellow, blue |
+| Page Up / Page Down | Channel up / down |
+
+`1` and `q` also leave text fields, so they can't be typed into a username in the browser.
+
+## Adding a Twitch user and key
+
+1. **Add user**: type your Twitch username. This only reads your public profile.
+2. **Add authentication key** (Users screen, select the user): the TV shows a code, for example `XMQWCVBR`.
+3. On a phone or PC open [twitch.tv/activate](https://www.twitch.tv/activate), log in to Twitch, enter the code and click **Authorize**.
+4. Within a few seconds the TV shows "Key added OK". A code is valid for 30 minutes; if it expires, press Enter for a new one.
+
+The key gives the app these Twitch permissions ([scopes](https://dev.twitch.tv/docs/authentication/scopes)):
+
+| Permission | Used for |
+| --- | --- |
+| `user:read:follows` | Your followed channels and live streams |
+| `user:read:subscriptions` | Checking whether you're subscribed to a channel (sub-only chat and VODs warnings, sub emotes) |
+| `chat:edit` | Sending chat messages as you |
+| `chat:read` | Reading chat as you |
 
 ## Controls
 
 ![control](https://fgl27.github.io/smarttv-twitch/screenshot/controler.png)
 
-The Application is tested with the above remotes (Any Samsung remote that has those same key/function must control the app even if the remote looks a little different)
+The app is tested with the remotes above; any Samsung remote with the same keys works. **INFO** has the same function as **GUIDE**.
 
-The key **INFO** is also mapped in the app with the same functions as the **GUIDE** key, as some remotes may not have one of those.
-
-### Below are the on-screen controls
-
-### To access the controls from any screen press key A or on smart remote press the 4 color buttons (color) after Directional pad up for red A key and chose controls. If you are playing a stream, use the C yellow key to directly open the controls
-
-### In app controls
+To open the on-screen controls from any screen, press the red **A** key (on a smart remote: the color button, then up for red) and choose Controls. While a stream plays, the yellow **C** key opens them directly.
 
 ![Main](https://fgl27.github.io/smarttv-twitch/screenshot/controls.png)
 
-## Installation instructions:
+## Building the minified release package
 
-### Installation guide **Tizen Studio for TVs with Tizen 2.3 or newer** (tested on Linux Ubuntu 16 and up, windows 10 64 bits and macOS Mojave 10.14.4)
+[`release/release_maker.sh`](release/release_maker.sh) (Linux, needs `uglify-js`, `jshint` and `crass` from npm) checks the code with JSHint, joins and minifies it into one `master.js` and creates a release zip that can be imported into Tizen Studio. The command-line deploy above doesn't need it.
 
-### Help and workarounds
+## Troubleshooting
 
-There is a issue section on this github page [smarttv-twitch/issues](https://github.com/fgl27/smarttv-twitch/issues) on this there is a few already open issues if you have a problem with the bellow steps check there to see if any of the already opened issues have the proper help for you, if not [open a new issue](https://github.com/fgl27/smarttv-twitch/issues/new/choose)
+| Problem | Fix |
+| --- | --- |
+| `TV ... is not connected` | The TV must be on, in developer mode, and its **Host PC IP** must be this PC's IP on the same network. Check `TV_IP`. Restart the TV after changing developer mode. |
+| Tizen Studio scan finds the TV but can't connect | Same as above: wrong Host PC IP is the usual cause (e.g. the PC's Wi-Fi or VirtualBox address instead of the wired one). |
+| Changes don't show on the TV | Open the **"(dev)"** app with the blue icon, not the original app. About shows the build date. |
+| `tizen package` fails | Check the certificate profile name, or leave `CERT_PROFILE` empty to use the active profile. |
+| A stream shows a black screen | Check whether the quality line shows `\| hls.js`. If it does, turn on `PlayHls_ShowDebug` (see above). If not, the stream isn't fMP4 and the native player had a problem. |
 
-### Account and Downloads
+## Credits and licenses
 
--   Create a Samsung account if you don't have one, and set it up as a developer account [SAMSUNG DEVELOPERS](http://developer.samsung.com/home.do)
+-   [fgl27/smarttv-twitch](https://github.com/fgl27/smarttv-twitch) by Felipe Leon: the original app this fork is based on (itself started from [CazuzaCzz](https://github.com/CazuzaCzz/SmartTwitchTV/commits/tizen) and [nikitakatchik](https://github.com/nikitakatchik/SmartTwitchTV)). fgl27 also maintains the Android TV version, [SmartTwitchTV](https://github.com/fgl27/SmartTwitchTV).
+-   [numbereleven-a/smarttv-twitch-old-tizen](https://github.com/numbereleven-a/smarttv-twitch-old-tizen): the audio/video track isolation approach and `app/lib/Fmp4TrackIsolation.js` (GPL-3.0).
+-   [hls.js](https://github.com/video-dev/hls.js) (Apache-2.0, `app/lib/hls.js-LICENSE`).
+-   Also used: [irc-message](https://github.com/sigkell/irc-message), [punycode](https://github.com/bestiejs/punycode.js), [Twemoji](https://github.com/twitter/twemoji), [Fontastic](http://app.fontastic.me), [Samsung Product API](https://developer.samsung.com/smarttv/develop/api-references/samsung-product-api-references.html), [Twitch API](https://dev.twitch.tv/docs/). Release build tools: [UglifyJS](https://github.com/mishoo/UglifyJS), [JSHint](https://github.com/jshint/jshint), [crass](https://github.com/mattbasta/crass).
 
--   [Download **Tizen Studio with IDE Installer**](https://developer.tizen.org/development/tizen-studio/download)
-
-### Set your TV to developer mode
-
--   Login to your Samsung TV with the Developer Account you just setup
--   Open the **"APPS"** application
--   Press the key sequence 12345 on your remote
--   On the new window that appears Click **"On"** to enable the **developer mode**
--   In the IP Address Field enter the local IP address of the computer you have downloaded Tizen Studio
--   Reboot the device to enable (on some TV holding the power key will reboot for others is necessary to remove the power from the wall)
-
-_If you don't know how to get the local IP of your computer go to the link here_ [How to get your IP](https://github.com/fgl27/smarttv-twitch#how-to-get-the-ip)
-
-### Installing Tizen Studio and Java SDK on Windows 10
-
-Before installing Tizen Studio you need to have Java 8 SDK installed
-You can install OpenJava JDK 8 with chocolately package manager or download and install the .exe from [Java SE Development Kit 8 Downloads
-](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
-
-#### Via chocolately
-
-Open Windows Powershell as Admin and run the following command to setup chocolately package manager
-
-```
-Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-```
-
-Close and Re-Open Windows Powershell once the installer is complete and then run the following command
-
-```
-choco install openjdk12
-```
-
-Run the web-ide_Tizen_Studio_X.X_windows-64.exe installer file you downloaded previously with the default options selected
-
-### Installing Tizen Studio and Java SDK on Ubunutu
-
--   I used the **Tizen Studio 3.7 with IDE installer** (Any version above that must work well), download the 32/64 bit according to your CPU architecture. On Linux, the file is an executable binary 641Mb in size. To run it, first give the file permission to execute - properties > permission > Execute... mark, then just drag the file to a terminal window and click enter, **On Linux it may ask you to use apt-get to install missing dependencies below are the one asked by Tizen Studio 2.4 last time I installed it**
-
-```
-sudo apt-get install libwebkitgtk-1.0-0 rpm2cpio cpio expect python2.7 ruby libcanberra-gtk-module libcanberra-gtk3-module gettext
-```
-
-If you are on ubuntu 19 or above 20.4 libwebkitgtk-1.0-0 ins't availeble, in that case check this link [Ubuntu 20 isn't yet supported by Tizen studio this are the steps to get all working](https://github.com/fgl27/smarttv-twitch/blob/master/release/githubio/etc/README_ubutu_20.md)
-
--   Install Java SDK, I install this app with **Open JDK java 8**
-    " (last know tested was "jdk-8u152-windows-x64.exe" any above that must work always try the latest version **but make sure is Java 8**), on Linux terminal commands below
-
-```
-sudo add-apt-repository ppa:openjdk-r/ppa
-sudo apt-get update
-sudo apt-get install openjdk-8-jdk
-```
-
--   Press enter and Click OK/YES and accept all the requests from java installer on the terminal
-
-### Tizen Package Manager(Installing the tools)
-
--   Open **Tizen Package Manager** to start installing the bellow (some may already be installed by default)
--   Main tab **(Main SDK)** Install **Tizen SDK tools** (Emulator manager not necessary), **(on Linux it may request you to use apt-get to install missing dependencies)**
-
-![mainsdk](https://fgl27.github.io/smarttv-twitch/screenshot/install/sdk_2.png)
-
--   Second tab **(Extension SDK)** under **TV Extensions-X.X** (or wherever newer/older X.X TV version there is) install **Web app. Development**, install **Samsung Certificate Extension** and under **TV Extension Tools** install **Web app. Tools**
-
-![extensionsdk](https://fgl27.github.io/smarttv-twitch/screenshot/install/sdk_4.png)
-
--   After latest update of Tizen Studio version 4.1 the TV Extensions became unavailable, this is a Tizen studio bug that may already be fixed but if that is still a issue when you are reading this check this... [Missing TV extension on Package Manager](https://github.com/fgl27/smarttv-twitch/issues/157#issuecomment-842215657)
--   Tizen is always changing the packages that are available some packages may became deprecated and not show anymore, proceed with the installation process even if packages aren't available for you, report a issue if the application doesn't install but make sure you go to all steps at least once again after a problem just revise it all before reporting.\*
--   After everything finishes installing as you close the package manager it will ask if you want to open the **Tizen Studio** - click YES to open it. On windows it may ask you to give firewall permission for Tizen.
-
-### Setting up the build environment:
-
--   Open **Tizen Studio**, then start the device manager by clicking on the drop-down menu that has the default option **"No target"** and select **"Launch remote device manager"**. If you don't find the device manager on the studio, just open it as a separate app - it must be installed just like the studio or use the menu Tools > Device Manager.
--   On the device manager, click **Scan** and it will find your TV if it is set up is ok and on the same network. If it doesn't find it, try to add it manually by clicking on the **+** option and add your TV IP address. Don't change the **Port**. To get the address, go to the main menu > network > Network status... wait a moment extra options will be loaded, click on **IP Settings** read your TV's IP Address
-
-![device_manager](https://fgl27.github.io/smarttv-twitch/screenshot/install/device_manager.png)
-
--   After having the TV IP showing in the screen, click in to connect, when connect you see something like the bellow
-    ![device_manager](https://fgl27.github.io/smarttv-twitch/screenshot/install/device_manager2.png)
-
-If you have a problem on connecting refer back to **[Account and Downloads:](https://github.com/fgl27/smarttv-twitch#account-and-downloads)**, without properly enabling **developer mode** on the TV this will fail.
-
-### Generate a certificate:
-
--   **Tizen Studio** > Tools > Certificate Manager > + > select/click **Tizen** > add a certificate name ... next > create a new author.. next > setup name password etc... next > Use the default Tizen... Finish > **If Success** you see a message **The new certficate profile has been sucesfully created.** click OK
--   Select the certificate it must have a check mark ✔️ on the front of it (that means you have selected it) close the Certificate Manager
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra1.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra2.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra3.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra4.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra5.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra6.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra7.png)
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate_extra8.png)
-
--   **If you click on finish and you see the image above, just go to the next step [Setup the application:](https://github.com/fgl27/smarttv-twitch#setup-the-application)**
-
--   if not, read the instructions below in order to address the Tizen issue on creating a certificate that started in late 2018 after some Tizen SDK version update
-
--   If when you click on **Finish** the app just tries and doesn't do anything, it is because it has an issue creating an Author - this is a bug of Tizen. To fix that, generate a certificate using this recommendation [Creating Certificates Samsung site](https://developer.samsung.com/galaxy-watch/develop/getting-certificates/create), but after you finish don't use that certificate because it may not work to install the app, repeat the process of creating a **Tizen** certificate ... Certificate Manager > + > select/click **Tizen** > here use the author created before by choosing "select existing..."
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate2.png)
-
--   Now find the folder that has the name "SamsungCertificate", open the folder inside (it has the name chosen when creating a Samsung profile) and choose the **author.p12 ** file
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate3.png)
-
--   Add the same password used before and click next > Use the default Tizen... Finish > **Success** click OK, it must be finished now
-
-![certificate](https://fgl27.github.io/smarttv-twitch/screenshot/install/certificate4.png)
-
-### Setup the application:
-
--   **[Download and extract the release_4_0_1_V9.zip file Click here, this is the application recipe file](https://github.com/fgl27/smarttv-twitch/releases/download/4.0.1_V9/4.0.1_V9.zip)**
-
--   Making the app, Top menu > File >Import > Tizen > Tizen Project > Click Browser > Select the extraced folder > Click Next > Click Finish
--   Wait for it to load
-
-![install_app1](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app1.png)
-![install_app2](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app2.png)
-![install_app3](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app3.png)
-![install_app4](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app4.png)
-![install_app5](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app5.png)
-![install_app5](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app6.png)
-
--   **Version** on the above image is the TV Extensions-X.X that you install on the bellow image, make sure to selected here is the same version number from the one you installed, as Tizen may receive updates and the day you are reading this 6.0 isn't available
-
-![extensionsdk](https://fgl27.github.io/smarttv-twitch/screenshot/install/sdk_4.png)
-
--   After latest update of Tizen Studio version 4.1 the TV Extensions became unavailable causing a error on the above step, this is a Tizen studio bug that may already be fixed but if that is still a issue when you are reading this check this... [Missing TV extension on Package Manager](https://github.com/fgl27/smarttv-twitch/issues/157#issuecomment-842215657)
-
-### Install the application:
-
--   If yours device uses square icons on the home screen (only devices running Tizen 5.5 and above need this, most of this devices are 2020 or newer models) as the bellow image shows, before the next step you need to set the proper icon, to do that is very simple, just delete the file **icon.png** and rename the **icon_square.png** to **icon.png**, if by mistake you used the wrong icon to install the app, you need to reinstall the app with the correct icon but before uninstall the old app, if that doesn't work then power-off the TV by unplugging it from the wall, after an power-on it must be OK.
--   Now the installation, left click on the folder **4.0.1_VX...etc** to select it, then right click > Run as > **1 Tizen Web Application**, the installation will start
--   If everything goes OK, the app will be opened in a few seconds on the TV, and you can start using it
-
-![install_app7](https://fgl27.github.io/smarttv-twitch/screenshot/install/install_app7.png)
-
-![icon_square](https://fgl27.github.io/smarttv-twitch/screenshot/install/icon_square.png)
-
--   If it fails during the installation, make sure you don't have any other Twitch.TV applications installed on the TV. To uninstall the app manually, just open the **"apps"** application, find all Twitch.TV apps you have installed in **"my app"** tab, hold down the enter/select key on the top of the app and choose delete. After you have deleted all Twitch.TV apps, try to install again.
-
-## Updates
-
-This app can update itself 99% of the time, is a very simple process every time you open the app (when it is fully closed not running on the background) it will download the latest version of the app code from the repository, this way the installation process will only have to be redone after a major update where the changes are in the files from the release.zip, the app will warn the user if is needed to update it manually by performing the installation steps again.
-
-## In doubt [open a issue](https://github.com/fgl27/smarttv-twitch/issues/new/choose)
-
-## Donations
-
-![Main](https://fgl27.github.io/SmartTwitchTV/screenshot/paypal.png) **Paypal email link (clickable):** [fglfgl27@gmail.com](https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=fglfgl27@gmail.com&lc=US&no_note=0&item_name=Donate+to+thanks+for+the+Twitch+Tizen+app&cn=&curency_code=USD&bn=PP-DonationsBF:btn_donateCC_LG.gif:NonHosted)
-
-![Main](https://fgl27.github.io/SmartTwitchTV/screenshot/bitcoin.png)**Bitcoin walet adress (or use bellow QR code):** 1DuhCT6L3VfBtFcS8FNfVXgBzE2rwCPx3x
-
-![Main](https://fgl27.github.io/SmartTwitchTV/screenshot/chart.png)
-
-## How to get the IP
-
-Linux terminal command:
-
-    hostname –I
-
-Result
-![ip_1](https://fgl27.github.io/smarttv-twitch/screenshot/etc/ubuntu_ip.png)
-
-Windows terminal command:
-
-    ipconfig
-
-Result
-![ip_2](https://fgl27.github.io/smarttv-twitch/screenshot/etc/windows_ip.png)
-
-Mac System Preferences > Network.<br>
-
-Result<br>
-![ip_3](https://fgl27.github.io/smarttv-twitch/screenshot/etc/mac_ip.jpg)
+This app has no affiliation with Twitch or Samsung. Licensed under the [GNU General Public License v3.0](LICENSE).

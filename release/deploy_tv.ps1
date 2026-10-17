@@ -12,15 +12,22 @@
 
     The TV must be in Developer Mode with this PC IP set as "Host PC IP".
 
+    The TV IP and the certificate profile come from, in this order:
+    the -Ip / -CertProfile parameters, the .env file in the repo root (git ignored, see .env.example),
+    or a question when the script runs.
+
 .EXAMPLE
     .\release\deploy_tv.ps1
 .EXAMPLE
-    .\release\deploy_tv.ps1 -TvIp 192.168.1.50 -CertProfile MyProfile -NoRun
+    .\release\deploy_tv.ps1 -Ip 192.168.1.50 -CertProfile MyProfile -NoRun
 #>
+# CmdletBinding makes unknown parameters (typos) an error instead of being ignored
+[CmdletBinding()]
 param(
-    [string]$TvIp = '192.168.1.50',
+    # .env TV_IP
+    [string]$Ip = '',
     [int]$TvPort = 26101,
-    # Tizen Studio certificate profile, empty = the active profile
+    # .env CERT_PROFILE, Tizen Studio certificate profile, empty = the active profile
     [string]$CertProfile = '',
     [string]$TizenStudio = 'C:\tizen-studio',
     [switch]$NoRun,
@@ -33,9 +40,53 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $appDir = Join-Path $repo 'app'
 $buildDir = Join-Path $appDir '.buildResult'
+$envFile = Join-Path $repo '.env'
 $tizen = Join-Path $TizenStudio 'tools\ide\bin\tizen.bat'
 $sdb = Join-Path $TizenStudio 'tools\sdb.exe'
-$target = "${TvIp}:${TvPort}"
+
+# Reads KEY=VALUE lines of the .env file, # starts a comment line, quotes around the value are optional
+function Read-EnvFile([string]$path) {
+    $values = @{}
+    if (-not (Test-Path $path)) { return $values }
+    foreach ($line in Get-Content $path) {
+        if ($line -match '^\s*#') { continue }
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') {
+            $values[$Matches[1]] = $Matches[2] -replace '^"(.*)"$', '$1' -replace "^'(.*)'$", '$1'
+        }
+    }
+    return $values
+}
+
+$envValues = Read-EnvFile $envFile
+
+$ipPattern = '^\d{1,3}(\.\d{1,3}){3}$'
+
+if (-not $PSBoundParameters.ContainsKey('Ip')) {
+    $Ip = $envValues['TV_IP']
+    if ($Ip -and $Ip -notmatch $ipPattern) { throw "TV_IP in $envFile is not an IPv4 address: $Ip" }
+} elseif ($Ip -notmatch $ipPattern) {
+    throw "-Ip is not an IPv4 address: $Ip"
+}
+while (-not $Ip) {
+    $Ip = (Read-Host 'TV IP address (TV Settings > General > Network > Network Status > IP Settings)').Trim()
+    if ($Ip -and $Ip -notmatch $ipPattern) {
+        Write-Host "Not an IPv4 address: $Ip" -ForegroundColor Yellow
+        $Ip = ''
+    } elseif ($Ip) {
+        Write-Host "Add TV_IP=$Ip to $envFile to skip this question" -ForegroundColor DarkGray
+    }
+}
+
+if (-not $PSBoundParameters.ContainsKey('CertProfile')) {
+    if ($envValues.ContainsKey('CERT_PROFILE') -and $envValues['CERT_PROFILE']) {
+        $CertProfile = $envValues['CERT_PROFILE']
+    } else {
+        $CertProfile = (Read-Host 'Tizen Studio certificate profile name (Enter = the active profile)').Trim()
+        if ($CertProfile) { Write-Host "Add CERT_PROFILE=$CertProfile to $envFile to skip this question" -ForegroundColor DarkGray }
+    }
+}
+
+$target = "${Ip}:${TvPort}"
 
 function Step($text) {
     Write-Host ''
@@ -61,7 +112,7 @@ foreach ($tool in @($tizen, $sdb)) {
 [xml]$config = Get-Content (Join-Path $appDir 'config.xml')
 $appId = $config.widget.application.id
 $appName = $config.widget.name
-Write-Host "App: $appName ($appId)  TV: $target"
+Write-Host "App: $appName ($appId)  TV: $target  Certificate profile: $(if ($CertProfile) { $CertProfile } else { '(active)' })"
 
 Step 'Build info'
 & node (Join-Path $PSScriptRoot 'stamp_build.js')
