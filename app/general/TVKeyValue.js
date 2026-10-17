@@ -78,4 +78,7 @@ function TVKeyValue_fixKey() {
     KEY_STOP = 73; //key I
     KEY_MEDIAREWIND = 79; //key O
     KEY_MEDIAFASTFORWARD = 80; //key P
+
+    //a PC keyboard has no IME Done key, Enter confirms the text inputs (add user, search, chat)
+    KEY_KEYBOARD_DONE = KEY_ENTER;
 }

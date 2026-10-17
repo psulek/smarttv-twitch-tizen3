@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Web server + open browser",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/webserver.js",
+            "args": ["8765", "app"],
+            "cwd": "${workspaceFolder}",
+            "skipFiles": ["<node_internals>/**"],
+            "serverReadyAction": {
+                "pattern": "listening on (https?://\\S+)",
+                "uriFormat": "%s",
+                "action": "openExternally"
+            }
+        },
+        {
+            "name": "Web server + debug in Chrome",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/webserver.js",
+            "args": ["8765", "app"],
+            "cwd": "${workspaceFolder}",
+            "skipFiles": ["<node_internals>/**"],
+            "serverReadyAction": {
+                "pattern": "listening on (https?://\\S+)",
+                "uriFormat": "%s",
+                "action": "debugWithChrome",
+                "webRoot": "${workspaceFolder}/app"
+            }
+        }
+    ]
+}

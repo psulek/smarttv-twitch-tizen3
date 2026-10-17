@@ -241,7 +241,8 @@ cp -rf master.js githubio/js/master.js;
 
 # Bundle master.js, master.css, icons css and the fonts it uses inside the .wgt
 # so the installed app doesn't download its code from github.io at startup
-mkdir -p js css/fonts lib
+mkdir -p js css/fonts lib images
+cp -rf ../app/images/temp.mp4 images/
 cp -rf ../app/lib/hls.light.min.js ../app/lib/hls.js-LICENSE ../app/lib/Fmp4TrackIsolation.js lib/
 cp -rf master.js js/master.js
 cp -rf githubio/css/master.css css/master.css
@@ -255,7 +256,7 @@ rm -rf *.zip
 zip -qr9 release ./ -x *.sh master.* html_body.js index_release.html api.js master.js \*githubio\* \*temp_maker\*
 
 # Clean up release/ folder temp files and stash all over git changes
-rm -rf js css lib
+rm -rf js css lib images
 rm -rf config.xml
 rm -rf widget.info
 rm -rf .project

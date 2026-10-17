@@ -74,7 +74,6 @@ function PlayVod_Start() {
 
     document.getElementById('controls_' + Play_controlsChatSend).style.display = 'none';
 
-    document.getElementById('controls_' + Play_controlsProxy).style.display = 'none';
 
     Play_CurrentSpeed = 3;
     Play_IconsResetFocus();
@@ -341,7 +340,7 @@ function PlayVod_Resume() {
             PlayVod_SaveOffset();
             PlayVod_SaveVodIds();
             Chat_Pause();
-            if (Main_IsNotBrowser) {
+            if (Main_HasPlayer) {
                 Play_avplay.pause();
                 Play_StopAndClose();
                 Main_values.vodOffset = parseInt(PlayVod_currentTime / 1000);
@@ -425,7 +424,7 @@ function PlayVod_loadDataRequest() {
                 '&p=' +
                 Main_RandomInt();
 
-            xmlHttp.open('GET', theUrl, true);
+            xmlHttp.open('GET', Main_ProxyUrl(theUrl), true);
         }
 
         xmlHttp.timeout = Play_loadingDataTimeout;
@@ -502,7 +501,7 @@ function PlayVod_loadDataError() {
             PlayVod_loadingDataTimeout += 250;
             PlayVod_loadDataRequest();
         } else {
-            if (Main_IsNotBrowser) {
+            if (Main_HasPlayer) {
                 Play_HideBufferDialog();
                 Play_PlayEndStart(2);
             } else PlayVod_loadDataSuccessFake();
@@ -660,7 +659,7 @@ function PlayVod_onPlayer() {
     console.log('PlayVod_onPlayer:', 'date: ' + new Date());
     console.log('PlayVod_onPlayer:', '\n' + '\n"' + PlayVod_playingUrl + '"\n');
 
-    if (Main_IsNotBrowser) {
+    if (Main_HasPlayer) {
         Play_StopAndCloseAndPlay(PlayVod_playingUrl);
 
         if (Main_values.vodOffset > ChannelVod_DurationSeconds) Main_values.vodOffset = 0;
@@ -737,7 +736,7 @@ function PlayVod_PlayerCheck() {
             else if (PlayVod_PlayerCheckCounter > 1) Play_CheckConnection(PlayVod_PlayerCheckCounter, 2, PlayVod_DropOneQuality);
             else {
                 PlayVod_qualityDisplay();
-                if (Main_IsNotBrowser && !Main_values.vodOffset) Main_values.vodOffset = Play_avplay.getCurrentTime() / 1000;
+                if (Main_HasPlayer && !Main_values.vodOffset) Main_values.vodOffset = Play_avplay.getCurrentTime() / 1000;
                 PlayVod_qualityChanged();
                 PlayVod_PlayerCheckRun = true;
             }
@@ -772,7 +771,7 @@ function PlayVod_DropOneQuality(ConnectionDrop) {
 
     PlayVod_PlayerCheckCounter = 0;
     PlayVod_qualityDisplay();
-    if (Main_IsNotBrowser && !Main_values.vodOffset) Main_values.vodOffset = Play_avplay.getCurrentTime() / 1000;
+    if (Main_HasPlayer && !Main_values.vodOffset) Main_values.vodOffset = Play_avplay.getCurrentTime() / 1000;
     PlayVod_qualityChanged();
     PlayVod_PlayerCheckRun = true;
 }
@@ -787,7 +786,7 @@ function PlayVod_shutdownStream() {
 
 function PlayVod_PreshutdownStream(saveOffset) {
     if (saveOffset) PlayVod_SaveVodIds();
-    if (Main_IsNotBrowser) Play_offPlayer();
+    if (Main_HasPlayer) Play_offPlayer();
     Main_ShowElement('controls_holder');
     Main_ShowElement('progress_pause_holder');
     PlayVod_isOn = false;
@@ -955,7 +954,7 @@ function PlayVod_jump() {
     }
 
     Play_clearPause();
-    if (!Play_isEndDialogVisible() && Main_IsNotBrowser) {
+    if (!Play_isEndDialogVisible() && Main_HasPlayer) {
         if (Play_isIdleOrPlaying()) Play_avplay.pause();
 
         try {
@@ -1019,7 +1018,7 @@ function PlayVod_jumpTime() {
 }
 
 function PlayVod_jumpStart(multiplier, duration_seconds) {
-    var currentTime = Main_IsNotBrowser ? Play_avplay.getCurrentTime() / 1000 : 0;
+    var currentTime = Main_HasPlayer ? Play_avplay.getCurrentTime() / 1000 : 0;
 
     window.clearTimeout(PlayVod_SizeClearID);
     PlayVod_IsJumping = true;

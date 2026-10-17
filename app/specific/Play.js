@@ -104,22 +104,6 @@ var Play_DefaultjumpTimers = [];
 var Play_UserLiveFeedPressed = false;
 var Play_base_kraken_headers_Array = [];
 
-var Play_base_parameters = 'reassignments_supported=true&playlist_include_framerate=true&allow_source=true&fast_bread=true&cdm=wv&p=%d';
-var Play_live_ttv_lol_links = 'https://api.ttv.lol/playlist/';
-var ttv_lol_headers = [['X-Donate-To', 'https://ttv.lol/donate']];
-
-var use_proxy;
-var purple_proxy = 'https://jupter.ga/hls/v2/channel/';
-var proxy_timeout = 5000;
-var proxy_url = '';
-var proxy_headers = null;
-var proxy_has_parameter = false;
-
-var proxy_fail_counter = 0;
-var proxy_fail_counter_checker = 0;
-
-//var proxy_ping_url = 'https://api.ttv
-
 //counterclockwise movement, Vertical/horizontal Play_ChatPositions
 //sizeOffset in relation to the size
 var Play_ChatPositionVal = [
@@ -222,6 +206,10 @@ function Play_PreStart() {
         Play_avplay = webapis.avplay;
         Play_avplayNative = webapis.avplay;
         Play_TizenVersion = tizen.systeminfo.getCapability('http://tizen.org/feature/platform.version');
+    } else if (Main_HasPlayer) {
+        //PC browser, play with hls.js
+        Play_avplay = PlayHls_Player;
+        Play_avplayNative = PlayHls_Player;
     }
 
     Play_chat_container = document.getElementById('chat_container0');
@@ -292,12 +280,29 @@ function Play_PreStart() {
 
 //this are the global set option that need to be set only once
 //and they need to be set like this to work, faking a video playback
-function Play_SetAvPlayGlobal() {
-    Play_StopAndCloseAndPlay('https://fgl27.github.io/smarttv-twitch/release/githubio/images/temp.mp4');
+//temp.mp4 is bundled in the app package (images/temp.mp4), AVPlay needs its absolute path
+var Play_TempVideoRemote = 'https://fgl27.github.io/smarttv-twitch/release/githubio/images/temp.mp4';
+
+function Play_TempVideoLocal() {
+    var path = decodeURIComponent(window.location.pathname);
+    return path.slice(0, path.lastIndexOf('/') + 1) + 'images/temp.mp4';
+}
+
+function Play_SetAvPlayGlobal(useRemote) {
+    Play_StopAndCloseAndPlay(useRemote ? Play_TempVideoRemote : Play_TempVideoLocal());
 
     Play_SetFullScreen(Play_isFullScreen);
     Play_avplay.setListener(PlayStart_listener);
-    Play_avplay.prepareAsync();
+    Play_avplay.prepareAsync(
+        function () {
+            console.log('Play_SetAvPlayGlobal ' + (useRemote ? 'remote' : 'local') + ' OK');
+        },
+        function (error) {
+            //TODO remove the remote fallback once the local file is confirmed to play on the TV
+            console.log('Play_SetAvPlayGlobal ' + (useRemote ? 'remote' : 'local') + ' error ' + error);
+            if (!useRemote) Play_SetAvPlayGlobal(true);
+        }
+    );
 }
 
 var PlayStart_listener = {
@@ -452,7 +457,6 @@ function Play_SetChatFont() {
 
 function Play_Start() {
     Play_showBufferDialog();
-    Play_ResetProxy();
 
     Main_empty('stream_info_title');
     Play_LoadLogoSucess = false;
@@ -465,7 +469,6 @@ function Play_Start() {
     //Chat delay
     document.getElementById('controls_' + Play_controlsChatDelay).style.display = '';
     document.getElementById('controls_' + Play_controlsChatSend).style.display = '';
-    document.getElementById('controls_' + Play_controlsProxy).style.display = '';
 
     document.getElementById('controls_' + Play_controlsLowLatency).style.display = Play_CanLowLatency ? '' : 'none';
 
@@ -862,61 +865,44 @@ function Play_LoadLogo(ImgObjet, link) {
     ImgObjet.src = link;
 }
 
-function Play_loadData(skipProxy) {
+function Play_loadData() {
     Play_loadingDataTry = 0;
     Play_loadingDataTimeout = 2000 + (Play_RestoreFromResume ? 3000 : 0);
-    Play_loadDataRequest(skipProxy);
+    Play_loadDataRequest();
 }
 
 var Play_410ERROR = true;
 var Play_hlsBaseURL = 'https://usher.ttvnw.net/api/channel/hls/';
-function Play_loadDataRequest(skipProxy) {
+function Play_loadDataRequest() {
     try {
         var theUrl;
         var xmlHttp = new XMLHttpRequest();
         var headers;
-        var useProxy;
 
-        if (use_proxy && !skipProxy && Play_state === Play_STATE_LOADING_TOKEN) {
-            //if at te end of a request the values are different we have a issues
-            proxy_fail_counter_checker = proxy_fail_counter;
-
-            useProxy = true;
-            Play_state = Play_STATE_LOADING_PLAYLIST;
-            headers = proxy_headers ? proxy_headers : [];
-
-            var URL_parameters = Play_base_parameters.replace('%d', Math.random() * 100000);
-            var url = proxy_url + Main_values.Play_selectedChannel + (proxy_has_parameter ? '.m3u8' + encodeURIComponent('?' + URL_parameters) : '');
-
-            xmlHttp.open('GET', url, true);
-
-            xmlHttp.timeout = proxy_timeout;
+        headers = Play_Headers;
+        if (Play_state === Play_STATE_LOADING_TOKEN) {
+            xmlHttp.open('POST', 'https://gql.twitch.tv/gql', true);
         } else {
-            headers = Play_Headers;
-            if (Play_state === Play_STATE_LOADING_TOKEN) {
-                xmlHttp.open('POST', 'https://gql.twitch.tv/gql', true);
-            } else {
-                if (!Play_tokenResponse.hasOwnProperty('value') || !Play_tokenResponse.hasOwnProperty('signature')) {
-                    Play_410ERROR = true;
-                    console.log('Play_410ERROR ' + Play_410ERROR);
-                    Play_loadDataError();
-                    return;
-                }
-
-                theUrl =
-                    Play_hlsBaseURL +
-                    Main_values.Play_selectedChannel +
-                    '.m3u8?&token=' +
-                    encodeURIComponent(Play_tokenResponse.value) +
-                    '&sig=' +
-                    Play_tokenResponse.signature +
-                    '&playlist_include_framerate=true&reassignments_supported=true&allow_source=true&fast_bread=true&cdm=wv&p=' +
-                    Main_RandomInt();
-
-                xmlHttp.open('GET', theUrl, true);
+            if (!Play_tokenResponse.hasOwnProperty('value') || !Play_tokenResponse.hasOwnProperty('signature')) {
+                Play_410ERROR = true;
+                console.log('Play_410ERROR ' + Play_410ERROR);
+                Play_loadDataError();
+                return;
             }
-            xmlHttp.timeout = Play_loadingDataTimeout;
+
+            theUrl =
+                Play_hlsBaseURL +
+                Main_values.Play_selectedChannel +
+                '.m3u8?&token=' +
+                encodeURIComponent(Play_tokenResponse.value) +
+                '&sig=' +
+                Play_tokenResponse.signature +
+                '&playlist_include_framerate=true&reassignments_supported=true&allow_source=true&fast_bread=true&cdm=wv&p=' +
+                Main_RandomInt();
+
+            xmlHttp.open('GET', Main_ProxyUrl(theUrl), true);
         }
+        xmlHttp.timeout = Play_loadingDataTimeout;
 
         if (headers && headers.length) {
             var len = headers.length;
@@ -932,10 +918,6 @@ function Play_loadDataRequest(skipProxy) {
                     Play_loadingDataTry = 0;
                     if (Play_isOn) Play_loadDataSuccess(xmlHttp.responseText);
                     //Play_410ERROR = false;
-                } else if (useProxy && PlayHLS_CheckProxyResultFail(xmlHttp.responseText)) {
-                    //if proxy fails fall back to normal request
-                    Play_state = Play_STATE_LOADING_TOKEN;
-                    Play_loadData(true);
                 } else if (!Settings_Obj_default('force_http_override') && xmlHttp.status === 0 && Main_startsWith(Play_hlsBaseURL, 'https:')) {
                     //https issue
                     //some devices are triggered with a status 0 when trying to get the playlist URL related to cors
@@ -944,10 +926,8 @@ function Play_loadDataRequest(skipProxy) {
                     //problem is that some devices will not allow http connection they demand https
 
                     Play_hlsBaseURL = Play_hlsBaseURL.replace('https:', 'http:');
-                    Play_live_ttv_lol_links = Play_live_ttv_lol_links.replace('https:', 'http:');
-                    proxy_url = proxy_url.replace('https:', 'http:');
 
-                    Play_loadDataRequest(skipProxy);
+                    Play_loadDataRequest();
                 } else if (xmlHttp.status === 403 || xmlHttp.status === 404) {
                     //forbidden access
                     //404 = off line
@@ -975,16 +955,6 @@ function Play_loadDataRequest(skipProxy) {
     }
 }
 
-function PlayHLS_CheckProxyResultFail(responseText) {
-    if (Main_A_includes_B(responseText, 'not_found: transcode does not exist')) {
-        return false;
-    }
-
-    proxy_fail_counter++;
-
-    return true;
-}
-
 function Play_loadDataLog(xmlHttp) {
     console.log('Play_loadDataLog status', xmlHttp.status);
     console.log('Play_loadDataLog responseText', xmlHttp.responseText);
@@ -998,7 +968,7 @@ function Play_loadDataError() {
             if (Play_RestoreFromResume) window.setTimeout(Play_loadDataRequest, 500);
             else Play_loadDataRequest();
         } else {
-            if (Main_IsNotBrowser) Play_loadDataErrorFinish();
+            if (Main_HasPlayer) Play_loadDataErrorFinish();
             else Play_loadDataSuccessFake();
         }
     }
@@ -1324,7 +1294,7 @@ function Play_onPlayer() {
     console.log('Play_onPlayer:', 'date: ' + new Date());
     console.log('Play_onPlayer:', '\n' + '\n"' + Play_playingUrl + '"\n');
 
-    if (Main_IsNotBrowser) {
+    if (Main_HasPlayer) {
         Play_loadChat();
 
         Play_StopAndCloseAndPlay(Play_playingUrl);
@@ -1442,7 +1412,7 @@ function Play_PlayerCheck() {
 // If idle or playing, the media is be played or process to
 // So we use PlayerCheck to avaluate if we are staled fro too long or not and drop the quality
 function Play_isIdleOrPlaying() {
-    if (Main_IsNotBrowser) {
+    if (Main_HasPlayer) {
         var state;
         try {
             state = Play_avplay.getState();
@@ -1513,7 +1483,7 @@ function Play_CheckConnection(counter, PlayVodClip, DropOneQuality) {
 }
 
 function Play_isNotplaying() {
-    if (Main_IsNotBrowser) return Play_avplay.getState() !== 'PLAYING';
+    if (Main_HasPlayer) return Play_avplay.getState() !== 'PLAYING';
     return false;
 }
 
@@ -1597,7 +1567,7 @@ function Play_shutdownStream() {
 }
 
 function Play_PreshutdownStream(closePlayer) {
-    if (Main_IsNotBrowser && closePlayer) Play_offPlayer();
+    if (Main_HasPlayer && closePlayer) Play_offPlayer();
     if (closePlayer) Play_isOn = false;
     if (!Play_isEndDialogVisible() || closePlayer) UserLiveFeed_Hide(true);
 
@@ -1607,7 +1577,7 @@ function Play_PreshutdownStream(closePlayer) {
 }
 
 function Play_offPlayer() {
-    if (Main_IsNotBrowser) {
+    if (Main_HasPlayer) {
         Play_StopAndClose();
     }
 }
@@ -1662,10 +1632,6 @@ function Play_ClearPlayer() {
             PlayClip_qualityPlaying = PlayClip_quality;
         }
     }
-}
-
-function Play_ResetProxy() {
-    Play_A_Control(Settings_get_enabled(), Play_controlsProxy);
 }
 
 function Play_A_Control(value, control) {
@@ -1759,7 +1725,6 @@ function Play_hidePanel() {
     Play_clearHidePanel();
     Play_ForceHidePannel();
     Play_quality = Play_qualityPlaying;
-    Play_ResetProxy();
 }
 
 function Play_showPanel() {
@@ -1777,24 +1742,7 @@ function Play_showPanel() {
 }
 
 function Play_UpdateVideoStatus() {
-    Main_innerHTML('stream_status', Play_UpdateVideoStatusGetProxy());
-}
-
-function Play_UpdateVideoStatusGetProxy() {
-    if (!Play_isOn) {
-        return '';
-    }
-    var proxyString = STR_BR + PROXY_SERVICE;
-
-    if (!use_proxy) {
-        return proxyString + PROXY_SERVICE_OFF;
-    }
-
-    if (proxy_fail_counter > proxy_fail_counter_checker) {
-        return proxyString + PROXY_SERVICE_FAIL.replace('%x', proxy_fail_counter);
-    }
-
-    return proxyString + PROXY_SERVICE_STATUS;
+    Main_innerHTML('stream_status', '');
 }
 
 function Play_ForceShowPannel() {
@@ -1899,9 +1847,9 @@ function Play_KeyPause(PlayVodClip) {
     if (Play_BufferDialogVisible()) return;
 
     if (Play_isNotplaying()) {
-        if (Main_IsNotBrowser) {
+        if (Main_HasPlayer) {
             try {
-                webapis.appcommon.setScreenSaver(webapis.appcommon.AppCommonScreenSaverState.SCREEN_SAVER_OFF);
+                if (Main_IsNotBrowser) webapis.appcommon.setScreenSaver(webapis.appcommon.AppCommonScreenSaverState.SCREEN_SAVER_OFF);
                 Play_avplay.play();
             } catch (e) {
                 console.log('Play_avplay.pause: ' + e);
@@ -1926,9 +1874,9 @@ function Play_KeyPause(PlayVodClip) {
             PlayClip_streamCheckId = window.setInterval(PlayClip_PlayerCheck, Play_PlayerCheckInterval);
         }
     } else {
-        if (Main_IsNotBrowser) {
+        if (Main_HasPlayer) {
             try {
-                webapis.appcommon.setScreenSaver(webapis.appcommon.AppCommonScreenSaverState.SCREEN_SAVER_ON);
+                if (Main_IsNotBrowser) webapis.appcommon.setScreenSaver(webapis.appcommon.AppCommonScreenSaverState.SCREEN_SAVER_ON);
                 Play_avplay.pause();
             } catch (e) {
                 console.log('Play_avplay.pause: ' + e);
@@ -2668,7 +2616,6 @@ var Play_controlsChatBright = 12;
 var Play_controlsChatFont = 13;
 var Play_controlsChatDelay = 14;
 var Play_controlsChatForceDis = 15;
-var Play_controlsProxy = 16;
 
 var Play_controlsDefault = Play_controlsChat;
 var Play_Panelcounter = Play_controlsDefault;
@@ -2793,7 +2740,7 @@ function Play_MakeControls() {
                 Play_onPlayer();
             } else if (PlayVodClip === 2) {
                 PlayVod_hidePanel();
-                if (Main_IsNotBrowser) {
+                if (Main_HasPlayer) {
                     Main_values.vodOffset = Play_avplay.getCurrentTime() / 1000;
                 }
                 PlayVod_quality = PlayVod_qualities[PlayVod_qualityIndex].id;
@@ -2855,7 +2802,7 @@ function Play_MakeControls() {
 
             Play_LowLatency = !Play_LowLatency;
 
-            if (Main_IsNotBrowser) Play_onPlayer();
+            if (Main_HasPlayer) Play_onPlayer();
 
             if (Play_LowLatency) {
                 Play_showWarningDialog(STR_LOW_LATENCY_SUMARRY);
@@ -3164,56 +3111,7 @@ function Play_MakeControls() {
         }
     };
 
-    Play_controls[Play_controlsProxy] = {
-        opacity: 0,
-        icons: 'proxy',
-        string: PROXY_SERVICE,
-        values: STR_PROXY_CONTROLS_ARRAY,
-        defaultValue: Settings_get_enabled(),
-        enterKey: function () {
-            var currentProxyEnabled = Settings_get_enabled(),
-                i,
-                key;
 
-            if (this.defaultValue < 1) {
-                key = proxyArray[this.defaultValue];
-                Settings_value[key].defaultValue = 1;
-                Main_setItem(key, 2);
-                Settings_set_all_proxy(key);
-            } else {
-                //reset all proxy to disable
-                i = 0;
-                var len = proxyArray.length;
-                for (i; i < len; i++) {
-                    key = proxyArray[i];
-                    Settings_value[key].defaultValue = 0;
-                    Main_setItem(key, 1);
-                }
-                use_proxy = false;
-            }
-
-            if (currentProxyEnabled !== Settings_get_enabled()) {
-                Play_showBufferDialog();
-                Play_state = Play_STATE_LOADING_TOKEN;
-                Play_loadData();
-            }
-
-            Play_ResetProxy();
-            Play_UpdateVideoStatus();
-        },
-        updown: function (adder) {
-            this.defaultValue += adder;
-            if (this.defaultValue < 0) this.defaultValue = 0;
-            else if (this.defaultValue > this.values.length - 1) this.defaultValue = this.values.length - 1;
-            this.bottomArrows();
-        },
-        bottomArrows: function () {
-            Play_BottomArrows(this.position);
-        },
-        setLable: function () {
-            Main_textContent('extra_button_text' + this.position, PROXY_SERVICE + this.values[this.defaultValue]);
-        }
-    };
 }
 
 function Play_IconsAddFocus() {

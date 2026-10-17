@@ -81,7 +81,6 @@ var Main_ExitDialogID = null;
 var Main_IsDayFirst = false;
 var Main_SearchInput;
 var Main_AddUserInput;
-var Main_AddCodeInput;
 var Main_ChatLiveInput;
 var Main_updateclockId;
 var Main_ContentLang = '';
@@ -129,6 +128,8 @@ var Main_IsNotBrowserVersion = '';
 var Main_Periods_Helix = [0, 1, 7, 30, 0];
 var Main_ClockOffset = 0;
 var Main_IsNotBrowser = 0;
+//true on the TV, and in a PC browser that can play HLS with hls.js (PlayHls.js), used for the player calls
+var Main_HasPlayer = 0;
 var Main_randomimg = '?' + Math.random();
 var Main_updateUserFeedId;
 var Main_vp9supported = false; //TODO check tizen support
@@ -230,6 +231,7 @@ function Main_loadTranslations(language) {
                 Main_Set();
 
                 Main_IsNotBrowser = tizen !== null;
+                Main_HasPlayer = Main_IsNotBrowser;
                 console.log('Main_IsNotBrowser tizen = ' + Main_IsNotBrowser);
                 Main_IsNotBrowserVersion = '1.0.0';
 
@@ -244,6 +246,8 @@ function Main_loadTranslations(language) {
                 console.log('Main_isReleased: ' + Main_isReleased);
                 console.log('Main_isDebug: ' + Main_isDebug);
                 console.log('Main_isBrowser: ' + !Main_IsNotBrowser);
+                Main_HasPlayer = PlayHls_IsSupported();
+                console.log('Main_HasPlayer (hls.js): ' + Main_HasPlayer);
                 TVKeyValue_fixKey();
             }
             Main_showLoadDialog();
@@ -271,7 +275,6 @@ function Main_loadTranslations(language) {
 
             Main_SearchInput = document.getElementById('search_input');
             Main_AddUserInput = document.getElementById('user_input');
-            Main_AddCodeInput = document.getElementById('oauth_input');
             Main_ChatLiveInput = Main_getElementById('chat_send_input');
 
             AddUser_RestoreUsers();
@@ -1112,6 +1115,17 @@ function Main_Checktylesheet() {
     });
 }
 
+//In a PC browser Twitch video servers block requests from other web pages (CORS),
+//webserver.js proxies them: https://host/path -> http://localhost:port/proxy/host/path
+function Main_ProxyUrl(url) {
+    if (Main_IsNotBrowser || !Main_HasPlayer) return url;
+
+    var match = /^https?:\/\/([^\/?#]+)(.*)$/.exec(url);
+    if (!match || match[1] === window.location.host) return url;
+
+    return window.location.protocol + '//' + window.location.host + '/proxy/' + match[1] + match[2];
+}
+
 function Main_LoadStylesheet(path) {
     var link = document.createElement('link');
     link.rel = 'stylesheet';
@@ -1483,7 +1497,6 @@ function Main_Set() {
         AddCode_clientId = atob(AddCode_clientId);
         AddCode_client_token = atob(AddCode_client_token);
         AddCode_client_backup = atob(AddCode_client_backup);
-        AddCode_redirect_uri = 'https://fgl27.github.io/smarttv-twitch/release/githubio/login2/twitch.html';
         Chat_token = atob(Chat_token);
 
         Play_Headers = [['Client-ID', Chat_token]];

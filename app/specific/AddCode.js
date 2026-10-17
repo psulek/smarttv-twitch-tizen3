@@ -2,9 +2,7 @@
 var AddCode_loadingDataTry = 0;
 var AddCode_loadingDataTryMax = 5;
 var AddCode_loadingDataTimeout = 10000;
-var AddCode_Code = 0;
 var AddCode_loadingData = false;
-var AddCode_keyBoardOn = false;
 var AddCode_IsFollowing = false;
 var AddCode_IsSub = false;
 var AddCode_PlayRequest = false;
@@ -13,6 +11,14 @@ var AddCode_Channel_id = '';
 var AddCode_Scopes = ['user:read:follows', 'user:read:subscriptions', 'chat:edit', 'chat:read'];
 
 var AddCode_UrlToken = 'https://id.twitch.tv/oauth2/token?';
+
+//Device code grant flow, the user activates the code on twitch.tv/activate from a phone or computer
+var AddCode_UrlDevice = 'https://id.twitch.tv/oauth2/device';
+var AddCode_UrlActivate = 'twitch.tv/activate';
+var AddCode_Device = null;
+var AddCode_DeviceId = 0;
+var AddCode_DevicePollId;
+var AddCode_DeviceTickId;
 //Variable initialization end
 
 function AddCode_init() {
@@ -20,27 +26,20 @@ function AddCode_init() {
     Main_CounterDialogRst();
     Main_HideWarningDialog();
     ScreensObj_SetTopLable(STR_USER_CODE);
-    Main_AddCodeInput.placeholder = STR_PLACEHOLDER_OAUTH;
     Main_ShowElement('oauth_scroll');
-    Main_innerHTML(
-        'oauth_text',
-        STR_OAUTH_IN +
-            '<div style="display: inline-block; color: #FF0000; font-size: 110%; font-family: \'Roboto-Bold\';">' +
-            AddUser_UsernameArray[Main_values.Users_AddcodePosition].name +
-            '</div>' +
-            STR_OAUTH_EXPLAIN
-    );
-    AddCode_inputFocus();
+    document.body.removeEventListener('keydown', AddCode_handleKeyDown);
+    document.body.addEventListener('keydown', AddCode_handleKeyDown, false);
+    AddCode_DeviceStart();
 }
 
 function AddCode_exit() {
-    AddCode_RemoveinputFocus(false);
+    AddCode_DeviceStop();
     document.body.removeEventListener('keydown', AddCode_handleKeyDown);
     Main_HideElement('oauth_scroll');
 }
 
 function AddCode_handleKeyDown(event) {
-    if (AddCode_loadingData || AddCode_keyBoardOn) return;
+    if (AddCode_loadingData) return;
 
     switch (event.keyCode) {
         case KEY_RETURN:
@@ -56,81 +55,171 @@ function AddCode_handleKeyDown(event) {
         case KEY_PAUSE:
         case KEY_PLAYPAUSE:
         case KEY_ENTER:
-            AddCode_inputFocus();
+            //only when there is no valid code, request a new one
+            if (!AddCode_Device) AddCode_DeviceStart();
             break;
         default:
             break;
     }
 }
 
-function AddCode_inputFocus() {
-    document.body.removeEventListener('keydown', AddCode_handleKeyDown);
-    document.body.addEventListener('keydown', AddCode_KeyboardEvent, false);
-    Main_AddCodeInput.placeholder = STR_PLACEHOLDER_OAUTH;
-    Main_AddCodeInput.focus();
-    AddCode_keyBoardOn = true;
+function AddCode_UserName() {
+    return AddUser_UsernameArray[Main_values.Users_AddcodePosition].name;
 }
 
-function AddCode_RemoveinputFocus(EnaKeydown) {
-    Main_AddCodeInput.blur();
-    AddCode_removeEventListener();
-    document.body.removeEventListener('keydown', AddCode_KeyboardEvent);
-    Main_AddCodeInput.placeholder = STR_PLACEHOLDER_PRESS + STR_PLACEHOLDER_OAUTH;
+function AddCode_DeviceRender(status) {
+    var html =
+        STR_OAUTH_IN +
+        '<div style="display: inline-block; color: #FF0000; font-size: 110%; font-family: \'Roboto-Bold\';">' +
+        AddCode_UserName() +
+        '</div>' +
+        STR_OAUTH_EXPLAIN;
 
-    if (EnaKeydown) document.body.addEventListener('keydown', AddCode_handleKeyDown, false);
-    window.setTimeout(function () {
-        AddCode_keyBoardOn = false;
-    }, 250);
-}
-
-function AddCode_removeEventListener() {
-    if (Main_AddCodeInput !== null) {
-        var elClone = Main_AddCodeInput.cloneNode(true);
-        Main_AddCodeInput.parentNode.replaceChild(elClone, Main_AddCodeInput);
-        Main_AddCodeInput = document.getElementById('oauth_input');
+    if (AddCode_Device) {
+        html +=
+            STR_BR +
+            STR_BR +
+            '<div style="text-align: center;">' +
+            STR_OAUTH_CODE +
+            STR_BR +
+            '<div style="display: inline-block; color: #FF0000; font-size: 260%; letter-spacing: 0.2em; font-family: \'Roboto-Bold\';">' +
+            AddCode_Device.user_code +
+            '</div>' +
+            STR_BR +
+            '<div style="font-size: 80%;">' +
+            STR_OAUTH_DIRECT_LINK +
+            AddCode_Device.verification_uri +
+            '</div></div>';
     }
+
+    html += STR_BR + '<div id="oauth_status" style="text-align: center;">' + status + '</div>';
+
+    Main_innerHTML('oauth_text', html);
 }
 
-function AddCode_KeyboardEvent(event) {
-    if (AddCode_loadingData) return;
+function AddCode_DeviceStop() {
+    AddCode_DeviceId++;
+    AddCode_Device = null;
+    window.clearTimeout(AddCode_DevicePollId);
+    window.clearInterval(AddCode_DeviceTickId);
+}
 
-    switch (event.keyCode) {
-        case KEY_RETURN:
-            if (Main_isAboutDialogShown()) Main_HideAboutDialog();
-            else if (Main_isControlsDialogShown()) Main_HideControlsDialog();
-            else {
-                Main_values.Main_Go = Main_Users;
-                AddCode_exit();
-                Main_SwitchScreen();
-            }
-            break;
-        case KEY_KEYBOARD_DELETE_ALL:
-            Main_AddCodeInput.value = '';
-            event.preventDefault();
-            break;
-        case KEY_KEYBOARD_DONE:
-        case KEY_KEYBOARD_CANCEL:
-        case KEY_DOWN:
-            if (Main_AddCodeInput.value !== '' && Main_AddCodeInput.value !== null) {
-                AddCode_Code = Main_AddCodeInput.value;
+function AddCode_DevicePost(url, body, callback) {
+    var xmlHttp = new XMLHttpRequest();
+
+    xmlHttp.open('POST', url, true);
+    xmlHttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    xmlHttp.timeout = AddCode_loadingDataTimeout;
+    xmlHttp.ontimeout = function () {};
+
+    xmlHttp.onreadystatechange = function () {
+        if (xmlHttp.readyState === 4) callback(xmlHttp);
+    };
+
+    xmlHttp.send(body);
+}
+
+function AddCode_DeviceScopes() {
+    return 'client_id=' + encodeURIComponent(AddCode_clientId) + '&scopes=' + encodeURIComponent(AddCode_Scopes.join(' '));
+}
+
+function AddCode_DeviceStart() {
+    AddCode_DeviceStop();
+    AddCode_DeviceRender(STR_OAUTH_CODE_LOADING);
+
+    var id = AddCode_DeviceId;
+
+    AddCode_DevicePost(AddCode_UrlDevice, AddCode_DeviceScopes(), function (xmlHttp) {
+        if (id !== AddCode_DeviceId) return;
+
+        var response = null;
+        try {
+            response = JSON.parse(xmlHttp.responseText);
+        } catch (e) {}
+
+        if (xmlHttp.status !== 200 || !response || !response.device_code) {
+            AddCode_DeviceRender(STR_OAUTH_CODE_FAIL);
+            return;
+        }
+
+        AddCode_Device = {
+            device_code: response.device_code,
+            user_code: response.user_code,
+            verification_uri: response.verification_uri || 'https://www.' + AddCode_UrlActivate,
+            interval: (parseInt(response.interval) || 5) * 1000,
+            expires: new Date().getTime() + (parseInt(response.expires_in) || 1800) * 1000
+        };
+
+        AddCode_DeviceRender('');
+        AddCode_DeviceTick();
+        AddCode_DeviceTickId = window.setInterval(AddCode_DeviceTick, 1000);
+        AddCode_DevicePollId = window.setTimeout(AddCode_DevicePoll, AddCode_Device.interval);
+    });
+}
+
+function AddCode_DeviceTick() {
+    if (!AddCode_Device) return;
+
+    var left = Math.floor((AddCode_Device.expires - new Date().getTime()) / 1000);
+
+    if (left <= 0) {
+        AddCode_DeviceExpired();
+        return;
+    }
+
+    var min = Math.floor(left / 60),
+        sec = left % 60;
+
+    Main_innerHTML('oauth_status', STR_OAUTH_WAITING + min + ':' + (sec < 10 ? '0' : '') + sec);
+}
+
+function AddCode_DeviceExpired() {
+    AddCode_DeviceStop();
+    AddCode_DeviceRender(STR_OAUTH_CODE_EXPIRED);
+}
+
+function AddCode_DevicePoll() {
+    if (!AddCode_Device) return;
+
+    var id = AddCode_DeviceId;
+
+    AddCode_DevicePost(
+        AddCode_UrlToken.slice(0, -1),
+        AddCode_DeviceScopes() +
+            '&device_code=' +
+            encodeURIComponent(AddCode_Device.device_code) +
+            '&grant_type=' +
+            encodeURIComponent('urn:ietf:params:oauth:grant-type:device_code'),
+        function (xmlHttp) {
+            if (id !== AddCode_DeviceId || !AddCode_Device) return;
+
+            if (xmlHttp.status === 200) {
+                var responseText = xmlHttp.responseText;
+                AddCode_DeviceStop();
+                AddCode_loadingData = true;
                 AddCode_loadingDataTry = 0;
                 Main_HideElement('oauth_scroll');
                 Main_showLoadDialog();
-                AddCode_requestTokens();
+                AddCode_requestTokensSucess(responseText);
+                return;
             }
-            AddCode_RemoveinputFocus(true);
-            break;
-        case KEY_KEYBOARD_BACKSPACE:
-            Main_AddCodeInput.value = Main_AddCodeInput.value.slice(0, -1);
-            event.preventDefault();
-            break;
-        case KEY_KEYBOARD_SPACE:
-            Main_AddCodeInput.value += ' ';
-            event.preventDefault();
-            break;
-        default:
-            break;
-    }
+
+            var message = '';
+            try {
+                message = JSON.parse(xmlHttp.responseText).message || '';
+            } catch (e) {}
+
+            //authorization_pending (user not done yet), slow_down or a network error (status 0) keep polling
+            if (message === 'slow_down') AddCode_Device.interval += 5000;
+            else if (xmlHttp.status === 400 && message !== 'authorization_pending') {
+                //invalid device code, expired or the user denied
+                AddCode_DeviceExpired();
+                return;
+            }
+
+            AddCode_DevicePollId = window.setTimeout(AddCode_DevicePoll, AddCode_Device.interval);
+        }
+    );
 }
 
 function AddCode_AppTokenCheck(tryes, callbackFunc, callbackFuncNOK) {
@@ -232,9 +321,7 @@ function AddCode_refreshTokens(position, tryes, callbackFunc, callbackFuncNOK) {
         '&client_secret=' +
         encodeURIComponent(AddCode_client_token) +
         '&refresh_token=' +
-        encodeURIComponent(AddUser_UsernameArray[position].refresh_token) +
-        '&redirect_uri=' +
-        AddCode_redirect_uri;
+        encodeURIComponent(AddUser_UsernameArray[position].refresh_token);
 
     xmlHttp.open('POST', url, true);
     xmlHttp.timeout = AddCode_loadingDataTimeout;
@@ -296,47 +383,14 @@ function AddCode_TokensCheckScope(scope) {
     return true;
 }
 
-function AddCode_requestTokens() {
-    var theUrl =
-        AddCode_UrlToken +
-        'grant_type=authorization_code&client_id=' +
-        encodeURIComponent(AddCode_clientId) +
-        '&client_secret=' +
-        encodeURIComponent(AddCode_client_token) +
-        '&code=' +
-        encodeURIComponent(AddCode_Code) +
-        '&redirect_uri=' +
-        AddCode_redirect_uri;
-
-    AddCode_BasexmlHttpGet(theUrl, 'POST', 0, null, AddCode_requestTokensReady);
-}
-
-function AddCode_requestTokensReady(xmlHttp) {
-    if (xmlHttp.readyState === 4) {
-        if (xmlHttp.status === 200) {
-            AddCode_requestTokensSucess(xmlHttp.responseText);
-        } else AddCode_requestTokensError();
-        return;
-    }
-}
-
-function AddCode_requestTokensError() {
-    AddCode_loadingDataTry++;
-    if (AddCode_loadingDataTry < AddCode_loadingDataTryMax) {
-        AddCode_requestTokens();
-    } else AddCode_requestTokensFail();
-}
-
 function AddCode_requestTokensFail() {
     Main_HideLoadDialog();
     Main_showWarningDialog(STR_OAUTH_FAIL);
     window.setTimeout(function () {
         Main_HideWarningDialog();
         Main_newUsercode = 0;
-        Main_HideWarningDialog();
-        Main_ShowElement('oauth_scroll');
-        AddCode_inputFocus();
         AddCode_loadingData = false;
+        AddCode_init();
     }, 4000);
     AddUser_UsernameArray[Main_values.Users_AddcodePosition].access_token = 0;
     AddUser_UsernameArray[Main_values.Users_AddcodePosition].refresh_token = 0;
@@ -357,6 +411,7 @@ function AddCode_requestTokensSucess(responseText) {
     var response = JSON.parse(responseText);
     AddUser_UsernameArray[Main_values.Users_AddcodePosition].access_token = response.access_token;
     AddUser_UsernameArray[Main_values.Users_AddcodePosition].refresh_token = response.refresh_token;
+    AddUser_UsernameArray[Main_values.Users_AddcodePosition].expires_in = response.expires_in;
     AddCode_loadingDataTry = 0;
     AddCode_CheckOauthToken();
 }
@@ -378,6 +433,7 @@ function AddCode_CheckOauthTokenSucess(response) {
     var token = JSON.parse(response);
     if (token.login && token.login.indexOf(AddUser_UsernameArray[Main_values.Users_AddcodePosition].name) !== -1) {
         AddUser_SaveUserArray();
+        AddCode_Refreshtimeout(Main_values.Users_AddcodePosition);
         Main_newUsercode = 0;
         Main_HideLoadDialog();
         Users_status = false;
@@ -390,16 +446,17 @@ function AddCode_CheckOauthTokenSucess(response) {
             Users_status = false;
             Users_init();
             AddCode_loadingData = false;
-            Main_AddCodeInput.value = '';
         }, 3000);
     } else {
         AddUser_UsernameArray[Main_values.Users_AddcodePosition].access_token = 0;
         AddUser_UsernameArray[Main_values.Users_AddcodePosition].refresh_token = 0;
+        AddUser_SaveUserArray();
+        Main_HideLoadDialog();
         Main_showWarningDialog(STR_OAUTH_FAIL_USER + AddUser_UsernameArray[Main_values.Users_AddcodePosition].name);
         window.setTimeout(function () {
             Main_HideWarningDialog();
-            Main_ShowElement('oauth_scroll');
-            AddCode_inputFocus();
+            AddCode_loadingData = false;
+            AddCode_init();
         }, 4000);
     }
     return;
@@ -456,6 +513,14 @@ function AddCode_CheckTokenError(position, tryes) {
 function AddCode_CheckFollow() {
     AddCode_loadingDataTry = 0;
     AddCode_IsFollowing = false;
+
+    //channels/followed needs the user key, without it Twitch only answers 401
+    if (!AddUser_UsernameArray[0].access_token) {
+        if (AddCode_PlayRequest) Play_setFollow();
+        else ChannelContent_setFollow();
+        return;
+    }
+
     AddCode_RequestCheckFollow();
 }
 
@@ -481,6 +546,10 @@ function AddCode_RequestCheckFollowReady(xmlHttp) {
         } else if (xmlHttp.status === 404) {
             //no
             AddCode_RequestCheckFollowNOK(xmlHttp.responseText);
+        } else if (xmlHttp.status === 401 || xmlHttp.status === 403) {
+            //key rejected, retrying gives the same answer
+            AddCode_loadingDataTry = AddCode_loadingDataTryMax;
+            AddCode_RequestCheckFollowError();
         } else {
             // internet error
             AddCode_RequestCheckFollowError();
@@ -794,7 +863,6 @@ function AddCode_BasexmlHttpGetValidate(callbackready, position, tryes) {
     xmlHttp.send(null);
 }
 
-var AddCode_redirect_uri = 'https://fgl27.github.io/smarttv-twitch/release/githubio/login/twitch.html';
 //Get yours client id and secret from https://docs.aws.amazon.com/lumberyard/latest/userguide/chatplay-generate-twitch-client-id.html
 var AddCode_clientId = 'Y2N6anV6ZXNwMGR4eDMxbGRxd3ViMjdqcTRjMjM3'; //public but get yours link above is free
 var AddCode_main_token;

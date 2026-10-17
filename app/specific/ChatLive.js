@@ -1567,6 +1567,9 @@ function ChatLive_checkEmotes(tags) {
             for (var i = 0, len = tags.emotes.length; i < len; i++) {
                 emote = tags.emotes[i].split(':');
 
+                //empty or malformed tag ("emotes=" or an id without positions), nothing to replace
+                if (!emote[1]) continue;
+
                 if (!emotes[emote[0]]) emotes[emote[0]] = [];
 
                 replacements = emote[1].split(',');

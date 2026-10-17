@@ -32,7 +32,6 @@ function en_USLang() {
     STR_SINCE = 'Since ';
     STR_AGAME = 'A Game';
     STR_PLACEHOLDER_SEARCH = 'Type your search...';
-    STR_PLACEHOLDER_OAUTH = 'Type your authentication key...';
     STR_PLACEHOLDER_USER = 'Type your username...';
     STR_PLACEHOLDER_PRESS = 'Press Enter or Select key to, ';
     STR_CHANNELS = 'Channels';
@@ -140,7 +139,7 @@ function en_USLang() {
     STR_F_DISABLE_CHAT = 'Chat force disable';
     STR_UPDATE_AVAILABLE = 'Update available, check google play store';
     STR_OAUTH_IN =
-        'Adding a key allows the app to access user follow content and logging to chat.<br><br> Add a key is not demanding and can be done at any point later.<br> In doubt read this link:<br> <br> https://https://github.com/fgl27/smarttv-twitch#twitchtv-authentication-key <br> <br>To add a key for ';
+        'Adding a key allows the app to access user follow content and logging to chat.<br><br> Add a key is not demanding and can be done at any point later.<br><br>To add a key for ';
     STR_USER_CODE = 'Add Authentication key';
     STR_USER_CODE_OK = 'Key added OK';
     STR_KEY_BAD = 'Key test failed, new one needs to be added';
@@ -266,8 +265,6 @@ function en_USLang() {
     STR_THUMB_RESOLUTION = 'Thumbnails quality';
     STR_THUMB_RESOLUTION_SUMARRY =
         "Default thumbnails resolution for live, videos and games (can't be applied for clips) a lower value will help the app load faster but the thumbnail may look blurry";
-    STR_PAYPAL_SUMMARY = 'Paypal donations use bellow link:';
-    STR_BITCOIN_SUMMARY = 'Bitcoin donations use wallet address:';
     STR_PLAYER_PROBLEM_2 = 'Connection failed, unable to load second stream info';
     STR_PLAYER_RESYNC = 'Player Auto Sync';
     STR_PLAYER_AUTO_BIG = 'Main window';
@@ -329,11 +326,16 @@ function en_USLang() {
     STR_Z_A = 'Alphabetical Z - A';
     STR_APP_ANIMATIONS = 'Enable app animations';
     STR_OAUTH_EXPLAIN1 = ', follow bellow steps:';
-    STR_OAUTH_EXPLAIN2 = 'Access the site link_link (using a computer or a smart phone)';
-    STR_OAUTH_EXPLAIN3 = 'Click the "Authorize" button which will take you to main Twitch.TV authentication site';
-    STR_OAUTH_EXPLAIN4 = 'Login to Twitch.TV using the username you are trying to add a key for';
-    STR_OAUTH_EXPLAIN5 = 'Click on Authorize button of Twitch.TV site if you agree with the requested permissions';
-    STR_OAUTH_EXPLAIN6 = 'The web page will update and show a key code, the key only has lowercase letters and numbers.';
+    STR_OAUTH_EXPLAIN2 = 'On a phone or computer open link_link';
+    STR_OAUTH_EXPLAIN3 = 'Log in to Twitch.TV using the username you are trying to add a key for';
+    STR_OAUTH_EXPLAIN4 = 'Enter the code shown bellow, then click Authorize if you agree with the requested permissions';
+    STR_OAUTH_EXPLAIN5 = 'This screen continues by itself once the code is authorized, no need to type anything here';
+    STR_OAUTH_CODE = 'Code:';
+    STR_OAUTH_DIRECT_LINK = 'Direct link: ';
+    STR_OAUTH_CODE_LOADING = 'Requesting a code from Twitch...';
+    STR_OAUTH_CODE_FAIL = 'Unable to get a code from Twitch, press Enter to try again';
+    STR_OAUTH_CODE_EXPIRED = 'The code expired or was not accepted, press Enter to get a new code';
+    STR_OAUTH_WAITING = 'Waiting for authorization, the code expires in ';
     STR_ENTER_REFRESH = 'Disable Hold enter to refresh';
     STR_RUNNINGTIME = 'App running for:';
     STR_410_ERROR = 'Unable to get stream link issue';
@@ -439,23 +441,6 @@ function en_USLang() {
     STR_WARNING_NEW =
         "Twitch is shutting down some of they API, making necessary to update all app API calls to they new API, the new API is different because of that it demands a lot of work.<br><br>Because of that the app is going thru a update phase, during this time some app content may not work.<br><br>Be aware with this new Twitch API is necessary to add a User and a Authentication key, if you don’t you may not have access to any content in future updates or after Twitch completely shutting they old API.<br><br>Some users may need to reinstall the app...If you have problem after see this warning, hold channel key up until you see a warning, now hold key down until the app restar, if that doesn't work, reinstall  the app.<br><br>This dialog will auto hide in 1 minute, or press any key to hide it";
     STR_FAIL_VOD_INFO = 'Fail to load VOD info';
-    STR_PROXY_DONATE_SUMMARY = 'If you wanna to thanks the proxy server maintainer use the link:';
-
-    STR_TTV_LOL = 'TTV LOL';
-    STR_PURPLE_ADBLOCK = 'Purple Adblock ';
-
-    STR_PROXY_TIMEOUT = 'Proxy timeout (time in seconds)';
-    STR_PROXY_TIMEOUT_SUMMARY =
-        'If the proxy server is out this will be the time that will take to "give up" on the connection and fallback to default Twitch implementation';
-
-    PROXY_SERVICE = 'Proxy: ';
-    PROXY_SERVICE_STATUS = 'Enabled and working';
-    PROXY_SERVICE_OFF = 'Disabled in settings';
-    PROXY_SERVICE_FAIL = 'Not working, fail %x times';
-
-    PROXY_SETTINGS = 'Proxy Settings (Internet censorship and related proxy)';
-    PROXY_SETTINGS_SUMMARY =
-        'Only one proxy can be enable, enables proxy server to get stream links from a different server, that may allow you to see content that is forbidden on yours region and avoid ads, disable this if you have any live stream issue too many or longer buffers, freezes or slow connection that may cause the stream quality to drop.';
     STR_FORCE_HTTP = 'Force HTTP';
     STR_FORCE_HTTP_SUMMARY =
         "Some devices can't perform some HTTPS requests with may cause the player not to work, setting this will force some connections to use HTTP only, this may solve player and related issues";

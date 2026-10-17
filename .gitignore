@@ -44,4 +44,5 @@ node_modules/*
 release/js/
 release/css/
 release/lib/
+release/images/
 app/.buildResult/

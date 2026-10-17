@@ -377,7 +377,13 @@ var PlayHls_Player = {
             //memory of older TVs is limited
             maxBufferLength: 30,
             maxMaxBufferLength: 60,
-            backBufferLength: 30
+            backBufferLength: 30,
+            //PC browser only, load Twitch playlists and segments thru the webserver.js proxy (CORS), see Main_ProxyUrl
+            xhrSetup: Main_IsNotBrowser
+                ? undefined
+                : function (xhr, url) {
+                      xhr.open('GET', Main_ProxyUrl(url), true);
+                  }
         });
 
         PlayHls_SplitFmp4Buffers(PlayHls_hls);
