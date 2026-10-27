@@ -326,24 +326,26 @@ function Play_UsePlayer(useHls) {
 
 //Check the media playlist of a stream before playing it and save on the qualities list which player it needs (qualities.useHls),
 //fMP4 segments (#EXT-X-MAP) need hls.js as AVPlay of older TVs shows only a black screen
+//qualities.isEvent: a VOD of a stream that is still live (the playlist still grows), players start it near its end
 function Play_CheckPlayerForPlaylist(qualities, callback) {
     var mediaUrl = qualities && qualities[0] && qualities[0].url;
 
-    if (!Main_IsNotBrowser || !mediaUrl) {
+    if (!Main_HasPlayer || !mediaUrl) {
         callback();
         return;
     }
 
     var xmlHttp = new XMLHttpRequest();
     var done = false;
-    var finish = function (useHls) {
+    var finish = function (useHls, isEvent) {
         if (done) return;
         done = true;
         qualities.useHls = useHls;
+        qualities.isEvent = isEvent;
         callback();
     };
 
-    xmlHttp.open('GET', mediaUrl, true);
+    xmlHttp.open('GET', Main_ProxyUrl(mediaUrl), true);
     xmlHttp.timeout = 5000;
     xmlHttp.ontimeout = function () {
         //keep the native player if the check fails
@@ -351,7 +353,11 @@ function Play_CheckPlayerForPlaylist(qualities, callback) {
     };
     xmlHttp.onreadystatechange = function () {
         if (xmlHttp.readyState === 4) {
-            finish(xmlHttp.status === 200 && xmlHttp.responseText.indexOf('#EXT-X-MAP') !== -1 && PlayHls_IsSupported());
+            var playlist = xmlHttp.status === 200 ? xmlHttp.responseText : '';
+            finish(
+                playlist.indexOf('#EXT-X-MAP') !== -1 && PlayHls_IsSupported(),
+                playlist.indexOf('#EXT-X-PLAYLIST-TYPE:EVENT') !== -1 && playlist.indexOf('#EXT-X-ENDLIST') === -1
+            );
         }
     };
 
@@ -1865,6 +1871,7 @@ function Play_KeyPause(PlayVodClip) {
             window.clearInterval(Play_streamCheckId);
             Play_streamCheckId = window.setInterval(Play_PlayerCheck, Play_PlayerCheckInterval);
         } else if (PlayVodClip === 2) {
+            PlayVod_SetPaused(false);
             if (Play_isPanelShown()) PlayVod_hidePanel();
             window.clearInterval(PlayVod_streamCheckId);
             PlayVod_streamCheckId = window.setInterval(PlayVod_PlayerCheck, Play_PlayerCheckInterval);
@@ -1890,6 +1897,7 @@ function Play_KeyPause(PlayVodClip) {
         window.clearInterval(PlayClip_streamCheckId);
 
         Main_innerHTML('pause_button', '<div ><i class="pause_button3d icon-play-1"></i></div>');
+        if (PlayVodClip === 2) PlayVod_SetPaused(true);
     }
 }
 

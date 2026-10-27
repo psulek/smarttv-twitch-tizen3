@@ -1418,6 +1418,14 @@
                 vertical-align: middle;
             }
 
+            /* VOD of a stream that is still live: the back button jumps to the start, the icon is doubled to << */
+            .back_button_start .icon-back:after {
+                content: '\46';
+                font-family: 'icons';
+                display: inline-block;
+                margin-left: -0.45em;
+            }
+
             .next_text {
                 display: inline-block;
                 width: auto;

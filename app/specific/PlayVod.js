@@ -41,6 +41,9 @@ var PlayVod_currentTime = 0;
 var PlayVod_VodIds = {};
 var PlayVod_VodPositions = 0;
 var PlayVod_PanelY = 0;
+//VOD of a stream that is still live, the back button left of pause jumps to its start
+var PlayVod_HasStartButton = false;
+var PlayVod_IsPaused = false;
 var PlayVod_ProgressBaroffset = 0;
 var PlayVod_StepsCount = 0;
 var PlayVod_TimeToJump = 0;
@@ -88,6 +91,8 @@ function PlayVod_Start() {
     Main_values.Play_isHost = false;
     PlayClip_HideShowNext(0, 0);
     PlayClip_HideShowNext(1, 0);
+    PlayVod_HasStartButton = false;
+    PlayVod_IsPaused = false;
     PlayVod_isOn = true;
 
     if (Main_values.vodOffset) {
@@ -533,9 +538,57 @@ function PlayVod_loadDataSuccess(responseText) {
         PlayVod_qualities = Play_extractQualities(PlayVod_playlistResponse);
         PlayVod_state = Play_STATE_PLAYING;
         Play_CheckPlayerForPlaylist(PlayVod_qualities, function () {
-            if (PlayVod_isOn) PlayVod_qualityChanged();
+            if (!PlayVod_isOn) return;
+            PlayVod_SetStartButton(PlayVod_qualities.isEvent);
+            PlayVod_qualityChanged();
         });
     }
+}
+
+//A VOD of a stream that is still live has a growing playlist and the player starts it near its end,
+//while it is paused the back button (left of pause) jumps to the start
+function PlayVod_SetStartButton(show) {
+    PlayVod_HasStartButton = !!show;
+    PlayVod_UpdateStartButton();
+}
+
+//paused with the pause button, playing again resets it
+function PlayVod_SetPaused(paused) {
+    PlayVod_IsPaused = !!paused;
+    PlayVod_UpdateStartButton();
+}
+
+function PlayVod_StartButtonVisible() {
+    return PlayVod_HasStartButton && PlayVod_IsPaused;
+}
+
+function PlayVod_UpdateStartButton() {
+    //clips share the pause and jump code and use the same button for the previous clip
+    if (!PlayVod_isOn) return;
+
+    var visible = PlayVod_StartButtonVisible();
+
+    if (visible) {
+        //icon only, no text
+        Main_textContent('back_button_text_name', '');
+        Main_textContent('back_button_text_title', '');
+        Main_AddClass('back_button', 'back_button_start');
+    } else {
+        Main_RemoveClass('back_button', 'back_button_start');
+    }
+
+    if (!visible && PlayClip_EnterPos === -1) {
+        PlayClip_EnterPos = 0;
+        PlayVod_IconsBottonFocus();
+    }
+
+    //1 = back_button, left of pause
+    PlayClip_HideShowNext(1, visible ? 1 : 0);
+}
+
+function PlayVod_JumpToStart() {
+    PlayVod_TimeToJump = 0;
+    PlayVod_jump();
 }
 
 function PlayVod_loadDataCheckSub() {
@@ -654,6 +707,7 @@ var PlayVod_listener = {
 };
 
 function PlayVod_onPlayer() {
+    PlayVod_SetPaused(false);
     Play_showBufferDialog();
 
     console.log('PlayVod_onPlayer:', 'date: ' + new Date());
@@ -785,6 +839,7 @@ function PlayVod_shutdownStream() {
 }
 
 function PlayVod_PreshutdownStream(saveOffset) {
+    PlayVod_SetStartButton(false);
     if (saveOffset) PlayVod_SaveVodIds();
     if (Main_HasPlayer) Play_offPlayer();
     Main_ShowElement('controls_holder');
@@ -985,6 +1040,8 @@ function PlayVod_jump() {
     Main_innerHTML('progress_bar_jump_to', STR_SPACE);
     document.getElementById('progress_bar_steps').style.display = 'none';
     Main_innerHTML('pause_button', '<div ><i class="pause_button3d icon-pause"></i> </div>');
+    //the jump plays the video again
+    PlayVod_SetPaused(false);
     PlayVod_jumpCount = 0;
     PlayVod_IsJumping = false;
     PlayVod_addToJump = 0;
@@ -1185,6 +1242,10 @@ function PlayVod_handleKeyDown(e) {
                     else if (!PlayVod_PanelY) {
                         PlayVod_jumpStart(-1, ChannelVod_DurationSeconds);
                         PlayVod_ProgressBaroffset = 2500;
+                    } else if (PlayVod_PanelY === 1 && PlayVod_StartButtonVisible() && !PlayClip_EnterPos) {
+                        //pause -> jump to start button
+                        PlayClip_EnterPos = -1;
+                        PlayVod_IconsBottonFocus();
                     }
                     PlayVod_setHidePanel();
                 } else if (Play_isVodDialogShown()) {
@@ -1230,6 +1291,10 @@ function PlayVod_handleKeyDown(e) {
                     else if (!PlayVod_PanelY) {
                         PlayVod_jumpStart(1, ChannelVod_DurationSeconds);
                         PlayVod_ProgressBaroffset = 2500;
+                    } else if (PlayVod_PanelY === 1 && PlayClip_EnterPos === -1) {
+                        //jump to start button -> pause
+                        PlayClip_EnterPos = 0;
+                        PlayVod_IconsBottonFocus();
                     }
                     PlayVod_setHidePanel();
                 } else if (Play_isVodDialogShown()) {
@@ -1293,6 +1358,8 @@ function PlayVod_handleKeyDown(e) {
                     Play_clearHidePanel();
                     if (!PlayVod_PanelY) {
                         if (PlayVod_addToJump) PlayVod_jump();
+                    } else if (PlayVod_PanelY === 1 && PlayClip_EnterPos === -1) {
+                        PlayVod_JumpToStart();
                     } else if (PlayVod_PanelY === 1) {
                         if (!Main_values.Play_ChatForceDisable) {
                             if (Play_isNotplaying()) Chat_Play(Chat_Id[0]);
